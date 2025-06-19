@@ -1,0 +1,28 @@
+[package]
+name = "iroh-chat-cli"
+version = "0.1.0"
+edition = "2024"
+default-run = "chat"
+
+[[bin]]
+name = "chat"
+path = "src/chat.rs"
+
+[[bin]]
+name = "a01"
+path = "src/a01.rs"
+
+
+[dependencies]
+anyhow = "1"
+base64 = "0.22"
+chrono = { version = "0.4", features = ["serde"] }
+clap = { version = "4", features = ["derive"] }
+futures-lite = "2.6"
+iroh = "0.35"
+iroh-gossip = "0.35"
+rand = "0.9"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_yaml = "0.9"
+tokio = "1.45"
