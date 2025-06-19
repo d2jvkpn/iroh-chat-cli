@@ -12,29 +12,15 @@ async fn main() -> io::Result<()> {
     println!("    Auto-exits after 60 seconds of inactivity.");
 
     loop {
-        tokio::select! {
+        let line = tokio::select! {
             // If the user types within 60 seconds, read and print
             // maybe_line =  stdin_lines.next_line() => {
             maybe_line = time::timeout(Duration::from_secs(60), stdin_lines.next_line()) => {
-                let line = match maybe_line {
+               match maybe_line {
                     Ok(v) => v,
                     Err(_) => {
                       println!("!!! No input received in 60 seconds. Exiting gracefully.");
                       break;
-                    }
-                };
-
-                match line {
-                    Ok(Some(v)) => {
-                        println!(">>> YOU: {}", v);
-                    }
-                    Ok(None) => {
-                        println!("<== End of input (EOF). Exiting.");
-                        break;
-                    }
-                    Err(e) => {
-                        eprintln!("!!! Error reading input: {}", e);
-                        break;
                     }
                 }
             }
@@ -44,6 +30,12 @@ async fn main() -> io::Result<()> {
                 println!("\n!!! Received Ctrl+C. Exiting.");
                 break;
             }
+        };
+
+        match line {
+            Ok(Some(v)) => println!(">>> YOU: {}", v),
+            Ok(None) => println!("<== End of input (EOF). Exiting."),
+            Err(e) => eprintln!("!!! Error reading input: {}", e),
         }
     }
 

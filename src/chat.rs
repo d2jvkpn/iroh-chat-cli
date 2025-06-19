@@ -1,7 +1,7 @@
-use std::{fmt::Debug, str::FromStr};
+use std::{collections::HashMap, fmt::Debug, str::FromStr, sync::Arc};
 
 use iroh_chat_cli::handlers::{input_loop, subscribe_loop};
-use iroh_chat_cli::structs::{COMMAND_QUIT, EOF_MESSAGE, Message, MessageBody, Ticket};
+use iroh_chat_cli::structs::{Msg, Ticket};
 use iroh_chat_cli::utils::{self, now};
 
 use anyhow::Result;
@@ -10,7 +10,7 @@ use iroh::protocol::Router;
 use iroh::{Endpoint, NodeAddr, RelayMap, RelayMode, RelayNode, RelayUrl, SecretKey};
 use iroh_gossip::{ALPN, net::Gossip, proto::TopicId};
 use rand::prelude::*;
-use tokio::{sync::mpsc, time};
+use tokio::sync::RwLock;
 
 /// Chat over iroh-gossip
 ///
@@ -102,7 +102,7 @@ async fn main() -> Result<()> {
         .unwrap_or_else(|| RelayMap::empty());
 
     let endpoint = if relay_map.is_empty() {
-        Endpoint::builder()
+        Endpoint::builder() // use default relay url: https://euw1-1.relay.iroh.network
     } else {
         Endpoint::builder().relay_mode(RelayMode::Custom(relay_map))
     }
@@ -154,45 +154,20 @@ async fn main() -> Result<()> {
         }
     }
 
+    dbg!(&node_ids);
     let (sender, receiver) = gossip.subscribe_and_join(topic, node_ids).await?.split();
     println!("--> {} connected!", now());
 
-    let message =
-        Message::new(MessageBody::AboutMe { from: node_id, name: name.clone(), at: now() });
-    sender.broadcast(message.to_vec().into()).await?;
+    let msg = Msg::AboutMe { from: node_id, name: name.clone(), at: now() };
+    sender.broadcast(msg.to_vec().into()).await?;
 
-    tokio::spawn(subscribe_loop(node_id, name.clone(), sender.clone(), receiver));
-
-    // spawn an input thread that reads stdin create a multi-provider, single-consumer channel
-    let (line_tx, mut line_rx) = mpsc::channel(1);
-    // and pass the `sender` portion to the `input_loop`
-    std::thread::spawn(move || input_loop(line_tx));
-
+    let members = Arc::new(RwLock::new(HashMap::new()));
+    tokio::spawn(subscribe_loop(node_id, name.clone(), sender.clone(), receiver, members.clone()));
     // broadcast each line we type
     println!("==> Type a message and hit enter to broadcast...");
-    // listen for lines that we have typed to be sent from `stdin`
-    while let Some(text) = line_rx.recv().await {
-        // create a message from the text
-        match utils::split_first_space(&text) {
-            (COMMAND_QUIT, _) => break,
-            _ => {}
-        }
+    input_loop(node_id, name.clone(), sender.clone(), members).await?;
 
-        let message = Message::new(MessageBody::Message { from: node_id, text: text.clone() });
-        // broadcast the encoded message
-        sender.broadcast(message.to_vec().into()).await?;
-        // print to ourselves the text that we sent
-        // println!(">>> You({:?}): {}\n{BRAEKING}", name, text);
-        println!(">>> {} You({:?})\n{EOF_MESSAGE}", now(), name);
-    }
-
-    let message = Message::new(MessageBody::Bye { from: node_id, at: now() });
-    // broadcast the encoded message
-    sender.broadcast(message.to_vec().into()).await?;
-
-    time::sleep(time::Duration::from_millis(100)).await;
     println!("<== {} Quit", now());
-
     router.shutdown().await?;
     Ok(())
 }

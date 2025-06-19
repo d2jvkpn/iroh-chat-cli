@@ -7,6 +7,10 @@ use iroh_gossip::proto::TopicId;
 use serde::{Deserialize, Serialize};
 
 pub const COMMAND_QUIT: &str = ":quit";
+pub const COMMAND_SEND: &str = ":send";
+pub const COMMAND_ME: &str = ":me";
+pub const COMMAND_ONLINE: &str = ":online";
+pub const MAX_FILESIZE: u64 = 32 * 1024 * 1024;
 
 pub const EOF_MESSAGE: &str = "--------------------------------";
 pub const EOF_EVENT: &str = "++++++++++++++++++++++++++++++++";
@@ -15,15 +19,23 @@ pub const EOF_ERROR: &str = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
 // add the message code to the bottom
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Message {
-    pub body: MessageBody,
+    pub body: Msg,
     nonce: [u8; 16],
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub enum MessageBody {
+pub enum Msg {
     AboutMe { from: NodeId, name: String, at: String },
     Message { from: NodeId, text: String },
+    File { from: NodeId, filename: String, content: Vec<u8> },
     Bye { from: NodeId, at: String },
+}
+
+impl Msg {
+    pub fn to_vec(self) -> Vec<u8> {
+        serde_json::to_vec(&Message { body: self, nonce: rand::random() })
+            .expect("serde_json::to_vec is infallible")
+    }
 }
 
 impl Message {
@@ -31,11 +43,11 @@ impl Message {
         serde_json::from_slice(bytes).map_err(Into::into)
     }
 
-    pub fn new(body: MessageBody) -> Self {
+    pub fn new(body: Msg) -> Self {
         Self { body, nonce: rand::random() }
     }
 
-    pub fn to_vec(&self) -> Vec<u8> {
+    pub fn to_bytes(&self) -> Vec<u8> {
         serde_json::to_vec(self).expect("serde_json::to_vec is infallible")
     }
 }

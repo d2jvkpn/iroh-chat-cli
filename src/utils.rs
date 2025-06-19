@@ -27,6 +27,11 @@ pub fn now() -> String {
     return now.to_rfc3339_opts(SecondsFormat::Millis, true);
 }
 
+pub fn filename_prefix() -> String {
+    let now = Local::now();
+    return now.format("%Y-%m-%d-%s").to_string();
+}
+
 pub fn iroh_secret_key() -> SecretKey {
     // let secret_key = SecretKey::generate(rand::rngs::ThreadRng); // !!! rand 0.8
     // let endpoint =
@@ -48,10 +53,10 @@ pub fn iroh_secret_key() -> SecretKey {
 pub async fn write_ticket(ticket: &Ticket, filename: &str) -> Result<()> {
     let node_addr = ticket.nodes.last().ok_or_else(|| anyhow!("nodes is empty"))?;
 
-    let configs = Path::new("configs");
-    fs::create_dir_all(configs).await?;
+    let dir = Path::new("configs");
+    fs::create_dir_all(dir).await?;
 
-    let filepath = configs.join(format!("{}.ticket", filename));
+    let filepath = dir.join(format!("{}.ticket", filename));
     let mut file = File::create(&filepath).await?;
     //file.write_all(&ticket.to_bytes()).await?;
     file.write_all(&ticket.to_bytes()).await?;
