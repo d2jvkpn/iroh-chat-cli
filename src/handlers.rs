@@ -189,14 +189,12 @@ pub async fn subscribe_loop(
             }
             Event::Gossip(GossipEvent::NeighborDown(from)) => {
                 let mut members = members.write().await;
-                let peer =
-                    members.remove_entry(&from).unwrap_or_else(|| (from, "UNKNOWN".to_string()));
-                println!(
-                    "<-- {} NeighborDown: {}, {:?}\n{EOF_EVENT}",
-                    now(),
-                    from.fmt_short(),
-                    peer.1,
-                );
+                let source = match members.remove_entry(&from) {
+                    Some(v) => format!("{}, {}", from.fmt_short(), v.1),
+                    None => format!("{from}"),
+                };
+                // members.remove_entry(&from).unwrap_or_else(|| (from, "UNKNOWN".to_string()));
+                println!("<-- {} NeighborDown: {source}\n{EOF_EVENT}", now(),);
                 continue;
             }
             Event::Gossip(GossipEvent::Received(msg)) => msg,
@@ -206,12 +204,11 @@ pub async fn subscribe_loop(
         match Message::from_bytes(&msg.content)?.msg {
             Msg::Bye { from, at: _ } => {
                 let mut members = members.write().await;
-                match members.remove_entry(&from) {
-                    Some((_, name)) => {
-                        println!("<-- {} Bye: {}, {name:?}\n{EOF_EVENT}", now(), from.fmt_short());
-                    }
-                    None => println!("<-- {} Bye: {from}, UNKNOWN\n{EOF_EVENT}", now()),
-                }
+                let source = match members.remove_entry(&from) {
+                    Some(v) => format!("{}, {}", from.fmt_short(), v.1),
+                    None => format!("{from}"),
+                };
+                println!("<-- {} Bye: {source}\n{EOF_EVENT}", now());
             }
             Msg::AboutMe { from, name: peer_name, at } => {
                 let mut members = members.write().await;
@@ -229,30 +226,20 @@ pub async fn subscribe_loop(
             Msg::Message { from, text } => {
                 let members = members.read().await;
                 // if it's a `Message` message, get the name from the map and print the message
-                let peer_name =
-                    members.get(&from).map_or_else(|| from.fmt_short(), String::to_string);
-                println!(
-                    "<<< {} Message: {peer_name:?}\n{}\n{EOF_MESSAGE}",
-                    now(),
-                    text.trim_end()
-                );
+                let source = format!("{}, {:?}", from.fmt_short(), members.get(&from));
+                println!("<<< {} Message: {source}\n{}\n{EOF_MESSAGE}", now(), text.trim_end());
             }
             Msg::File { from, filename, content } => {
                 let members = members.read().await;
                 // if it's a `Message` message, get the name from the map and print the message
-                let peer_name =
-                    members.get(&from).map_or_else(|| from.fmt_short(), String::to_string);
-                tokio::spawn(save_file(from, peer_name, filename, content));
+                let source = format!("{}, {:?}", from.fmt_short(), members.get(&from));
+                tokio::spawn(save_file(source, filename, content));
             }
             Msg::Share { from, filename, ticket } => {
                 let members = members.read().await;
                 // if it's a `Message` message, get the name from the map and print the message
-                let peer_name =
-                    members.get(&from).map_or_else(|| from.fmt_short(), String::to_string);
-                println!(
-                    "<<< {} Share: {peer_name:?}\n    {ticket} {filename}\n{EOF_MESSAGE}",
-                    now(),
-                );
+                let source = format!("{}, {:?}", from.fmt_short(), members.get(&from));
+                println!("<<< {} Share: {source}\n    {ticket} {filename}\n{EOF_MESSAGE}", now(),);
             }
         }
     }

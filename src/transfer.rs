@@ -58,15 +58,15 @@ pub async fn file_msg(node_id: NodeId, filename: String) -> Option<Msg> {
     return Some(Msg::File { from: node_id, filename: filename.clone(), content });
 }
 
-pub async fn save_file(from: NodeId, name: String, filename: String, content: Vec<u8>) {
+pub async fn save_file(source: String, filename: String, content: Vec<u8>) {
     let dir = path::Path::new("data").join("downloads");
 
-    println!("<-- {} ReceivedFile: {name:?}, {}, {filename}\n{EOF_EVENT}", now(), from.fmt_short());
+    println!("<-- {} ReceivingFile: {source}, {filename}\n{EOF_EVENT}", now());
 
     let filepath = match path::Path::new(&filename).file_name() {
         Some(v) => v.to_string_lossy().to_string(),
         None => {
-            println!("!!!! Invalid filepath: filename");
+            println!("!!!! Invalid filepath: {source}, filename");
             return;
         }
     };
@@ -74,26 +74,21 @@ pub async fn save_file(from: NodeId, name: String, filename: String, content: Ve
     let filepath = dir.join(format!("{}_{}", utils::filename_prefix(), filepath));
 
     if content.len() > MAX_FILESIZE.try_into().unwrap() {
-        println!("!!! File size is large than {MAX_FILESIZE}");
+        println!("!!! File size is too large: {source}, {MAX_FILESIZE}");
         return;
     }
 
     if let Err(e) = fs::create_dir_all(dir.clone()).await {
-        println!("!!! Failed to create dir: {filename}, {e:?}");
+        println!("!!! Failed to create dir: {source}, {filename}, {e:?}");
         return;
     }
 
     if let Err(e) = fs::write(&filepath, content).await {
-        println!("!!! Failed to write file: {filename}, {e:?}");
+        println!("!!! Failed to write file: {source}, {filename}, {e:?}");
         return;
     };
 
-    println!(
-        "<-- {} SavedFile: {name:?}, {}, {}\n{EOF_EVENT}",
-        now(),
-        from.fmt_short(),
-        filepath.display(),
-    );
+    println!("<-- {} SavedFile: {source}, {}\n{EOF_EVENT}", now(), filepath.display());
 }
 
 pub async fn send_file(
