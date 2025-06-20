@@ -1,7 +1,7 @@
 use std::path;
 
 use crate::structs::{EOF_ERROR, EOF_EVENT, MAX_FILESIZE, Msg};
-use crate::utils::{self, now};
+use crate::utils;
 
 use anyhow::Result;
 use iroh::NodeId;
@@ -9,12 +9,13 @@ use iroh_blobs::rpc::client::blobs::{MemClient, WrapOption};
 use iroh_blobs::store::{ExportFormat, ExportMode};
 use iroh_blobs::{ticket::BlobTicket, util::SetTagOption};
 use tokio::fs;
+use tracing::{error, info, warn}; // Level, instrument
 
 pub async fn file_msg(node_id: NodeId, filename: String) -> Option<Msg> {
     let filepath = path::Path::new(&filename);
 
     if !(filepath.exists() && filepath.is_file()) {
-        println!("!!! invalid input file");
+        warn!("invalid input file: {filename}");
         return None;
     }
 
@@ -31,17 +32,17 @@ pub async fn file_msg(node_id: NodeId, filename: String) -> Option<Msg> {
     let metadata = match fs::metadata(&filepath).await {
         Ok(v) => v,
         Err(e) => {
-            println!("!!! Failed to read file: {filename}, {e:?}");
+            error!("failed to read file: {filename}, {e:?}");
             return None;
         }
     };
 
     if metadata.len() > MAX_FILESIZE {
-        println!("!!! File size is large than {MAX_FILESIZE}");
+        error!("file size is large than {MAX_FILESIZE}");
         return None;
     }
 
-    println!("--> {} SendingFile: {filename}\n{EOF_EVENT}", now());
+    info!("--> SendingFile: {filename}\n{EOF_EVENT}");
 
     //let content = fs::read(filepath).await.map_err(|e| {
     //    println!("!!! {} Failed to read file: {}, {}", now(), filename, e);
@@ -50,7 +51,7 @@ pub async fn file_msg(node_id: NodeId, filename: String) -> Option<Msg> {
     let content = match fs::read(&filepath).await {
         Ok(v) => v,
         Err(e) => {
-            println!("!!! {} Failed to read file: {filename}, {e:?}\n{EOF_ERROR}", now());
+            error!("failed to read file: {filename}, {e:?}\n{EOF_ERROR}");
             return None;
         }
     };
@@ -61,12 +62,12 @@ pub async fn file_msg(node_id: NodeId, filename: String) -> Option<Msg> {
 pub async fn save_file(source: String, filename: String, content: Vec<u8>) {
     let dir = path::Path::new("data").join("downloads");
 
-    println!("<-- {} ReceivingFile: {source}, {filename}\n{EOF_EVENT}", now());
+    info!("<-- ReceivingFile: {source}, {filename}\n{EOF_EVENT}");
 
     let filepath = match path::Path::new(&filename).file_name() {
         Some(v) => v.to_string_lossy().to_string(),
         None => {
-            println!("!!!! Invalid filepath: {source}, filename");
+            error!("invalid filepath: {source}, filename");
             return;
         }
     };
@@ -74,21 +75,21 @@ pub async fn save_file(source: String, filename: String, content: Vec<u8>) {
     let filepath = dir.join(format!("{}_{}", utils::filename_prefix(), filepath));
 
     if content.len() > MAX_FILESIZE.try_into().unwrap() {
-        println!("!!! File size is too large: {source}, {MAX_FILESIZE}");
+        error!("file size is too large: {source}, {MAX_FILESIZE}");
         return;
     }
 
     if let Err(e) = fs::create_dir_all(dir.clone()).await {
-        println!("!!! Failed to create dir: {source}, {filename}, {e:?}");
+        error!("failed to create dir: {source}, {filename}, {e:?}");
         return;
     }
 
     if let Err(e) = fs::write(&filepath, content).await {
-        println!("!!! Failed to write file: {source}, {filename}, {e:?}");
+        error!("failed to write file: {source}, {filename}, {e:?}");
         return;
     };
 
-    println!("<-- {} SavedFile: {source}, {}\n{EOF_EVENT}", now(), filepath.display());
+    info!("<-- SavedFile: {source}, {}\n{EOF_EVENT}", filepath.display());
 }
 
 pub async fn send_file(

@@ -11,6 +11,10 @@ use rand::prelude::*;
 use serde_yaml::Value;
 use tokio::fs::{self, File};
 use tokio::io::AsyncWriteExt;
+// use tracing::{error, info, instrument, warn}; // Level
+use tracing_appender::rolling;
+use tracing_subscriber::EnvFilter;
+use tracing_subscriber::fmt::{format, time::FormatTime, writer::MakeWriterExt};
 
 pub fn load_yaml(path: &str) -> Result<Value> {
     let contents = std::fs::read_to_string(path)?;
@@ -79,6 +83,31 @@ pub fn split_first_space(mut s: &str, trim: bool) -> (&str, Option<&str>) {
         Some((first, rest)) => (first, Some(rest)),
         None => (s, None), // when no space in s
     }
+}
+
+struct LogTimer;
+
+impl FormatTime for LogTimer {
+    fn format_time(&self, w: &mut format::Writer<'_>) -> std::fmt::Result {
+        let now = Local::now();
+        write!(w, "{}", now.format("%Y-%m-%dT%H:%M:%S%:z"))
+    }
+}
+
+pub fn init_log(app: &str, level: &str) {
+    let file_appender = rolling::daily("logs", app);
+    let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
+
+    // RUST_LOG=my_app=info,my_app::submod=debug
+    // RUST_LOG=tokio=info,my_crate=debug
+    // .with_env_filter(EnvFilter::from_default_env())
+    //  with_max_level(Level::WARN)
+    tracing_subscriber::fmt()
+        .with_timer(LogTimer)
+        .with_target(false)
+        .with_env_filter(EnvFilter::new(level))
+        .with_writer(non_blocking.and(std::io::stdout))
+        .init();
 }
 
 #[cfg(test)]

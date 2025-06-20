@@ -14,6 +14,7 @@ use iroh_blobs::{net_protocol::Blobs, ticket::BlobTicket};
 use iroh_gossip::net::{Event, GossipEvent, GossipReceiver, GossipSender};
 use tokio::io::{self, AsyncBufReadExt};
 use tokio::{sync::RwLock, time};
+use tracing::{error, info, warn}; // Level, instrument
 
 /// Read input from stdin
 pub async fn input_loop(
@@ -50,8 +51,7 @@ pub async fn input_loop(
         buffer.clear(); // clear the buffer after we've sent the content
      */
 
-    let stdin = io::stdin();
-    let mut reader = io::BufReader::new(stdin).lines();
+    let mut reader = io::BufReader::new(io::stdin()).lines();
     let mut buffer = String::new();
 
     while let Some(line) = reader.next_line().await? {
@@ -86,7 +86,7 @@ pub async fn input_loop(
             COMMAND_SEND => {
                 let (filename, _) = utils::split_first_space(&line[COMMAND_SEND.len()..], true);
                 if filename.is_empty() {
-                    println!("!!! no input file");
+                    warn!("no input file");
                     continue;
                 };
 
@@ -96,16 +96,14 @@ pub async fn input_loop(
                 };
 
                 match sender.broadcast(msg.to_vec().into()).await {
-                    Ok(_) => println!("--> {} SentFileOK: {filename}\n{EOF_EVENT}", now()),
-                    Err(e) => {
-                        println!("!!! {} SendFileError: {filename}, {e:?}\n{EOF_ERROR}", now())
-                    }
+                    Ok(_) => info!("--> SentFileOK: {filename}\n{EOF_EVENT}"),
+                    Err(e) => error!("SendFileError: {filename}, {e:?}\n{EOF_ERROR}"),
                 }
             }
             COMMAND_SHARE => {
                 let (filename, _) = utils::split_first_space(&line[COMMAND_SHARE.len()..], true);
                 if filename.is_empty() {
-                    println!("!!! no input file");
+                    warn!("no input file");
                     continue;
                 };
 
@@ -113,16 +111,16 @@ pub async fn input_loop(
                 let ticket = match send_file(blobs_client, node_id, filename.to_string()).await {
                     Ok(v) => v,
                     Err(e) => {
-                        println!("!!! {} send_file:\n    {filename}, {e:?}\n{EOF_EVENT}", now());
+                        error!("send_file:\n    {filename}, {e:?}\n{EOF_EVENT}");
                         continue;
                     }
                 };
-                println!("--> {} send_file:\n    {ticket} {filename}\n{EOF_EVENT}", now());
+                info!("--> send_file:\n    {ticket} {filename}\n{EOF_EVENT}");
 
                 let msg = Msg::Share { from: node_id, filename: filename.to_string(), ticket };
                 match sender.broadcast(msg.to_vec().into()).await {
-                    Ok(_) => println!(">>> {} You({:?})\n{EOF_MESSAGE}", now(), name),
-                    Err(e) => println!("!!! {} BroadcastError: {e:?}\n{EOF_ERROR}", now()),
+                    Ok(_) => info!(">>> You({:?})\n{EOF_MESSAGE}", name),
+                    Err(e) => error!("BroadcastError: {e:?}\n{EOF_ERROR}"),
                 }
             }
             COMMAND_RECEIVE => {
@@ -132,7 +130,7 @@ pub async fn input_loop(
                 let filename = match filename {
                     Some(v) => v,
                     None => {
-                        println!("!!! no filename");
+                        warn!("no filename");
                         continue;
                     }
                 };
@@ -140,21 +138,21 @@ pub async fn input_loop(
                 let ticket: BlobTicket = match ticket.parse() {
                     Ok(v) => v,
                     Err(e) => {
-                        println!("!!! invalid ticket: {e:?}");
+                        error!("invalid ticket: {e:?}");
                         continue;
                     }
                 };
 
                 match receive_file(blobs_client, ticket, filename.to_string()).await {
-                    Ok(_) => println!("<-- {} ReceivedFile: {filename}", now()),
-                    Err(e) => println!("!!! {} ReceivedFile: {filename}, {e:?}", now()),
+                    Ok(_) => info!("<-- ReceivedFile: {filename}"),
+                    Err(e) => error!("ReceivedFile: {filename}, {e:?}"),
                 }
             }
             _ => {
                 let msg = Msg::Message { from: node_id, text: text };
                 match sender.broadcast(msg.to_vec().into()).await {
-                    Ok(_) => println!(">>> {} You({:?})\n{EOF_MESSAGE}", now(), name),
-                    Err(e) => println!("!!! {} BroadcastError: {e:?}\n{EOF_ERROR}", now()),
+                    Ok(_) => info!(">>> You({:?})\n{EOF_MESSAGE}", name),
+                    Err(e) => error!("BroadcastError: {e:?}\n{EOF_ERROR}"),
                 }
             }
         }
@@ -176,15 +174,15 @@ pub async fn subscribe_loop(
     while let Some(event) = receiver.try_next().await? {
         let msg = match event {
             Event::Lagged => {
-                println!("<-- {} Lagged\n{EOF_EVENT}", now());
+                warn!("<-- Lagged\n{EOF_EVENT}");
                 continue;
             }
             Event::Gossip(GossipEvent::Joined(node_ids)) => {
-                println!("<-- {} Joined: {:?}\n{EOF_EVENT}", now(), node_ids);
+                info!("<-- Joined: {:?}\n{EOF_EVENT}", node_ids);
                 continue;
             }
             Event::Gossip(GossipEvent::NeighborUp(from)) => {
-                println!("<-- {} NeighborUp: {from}\n{EOF_EVENT}", now());
+                info!("<-- NeighborUp: {from}\n{EOF_EVENT}");
                 continue;
             }
             Event::Gossip(GossipEvent::NeighborDown(from)) => {
@@ -194,7 +192,7 @@ pub async fn subscribe_loop(
                     None => format!("{from}"),
                 };
                 // members.remove_entry(&from).unwrap_or_else(|| (from, "UNKNOWN".to_string()));
-                println!("<-- {} NeighborDown: {source}\n{EOF_EVENT}", now(),);
+                info!("<-- NeighborDown: {source}\n{EOF_EVENT}");
                 continue;
             }
             Event::Gossip(GossipEvent::Received(msg)) => msg,
@@ -208,7 +206,7 @@ pub async fn subscribe_loop(
                     Some(v) => format!("{}, {}", from.fmt_short(), v.1),
                     None => format!("{from}"),
                 };
-                println!("<-- {} Bye: {source}\n{EOF_EVENT}", now());
+                warn!("<-- Bye: {source}\n{EOF_EVENT}");
             }
             Msg::AboutMe { from, name: peer_name, at } => {
                 let mut members = members.write().await;
@@ -216,18 +214,18 @@ pub async fn subscribe_loop(
                 if !members.contains_key(&from) {
                     members.insert(from, peer_name.clone());
                     // println!("<-- Peer: {} is now known as {:?}", from, name);
-                    println!("<-- {} NewPeer: {from}\n    {peer_name:?}, {at}\n{EOF_EVENT}", now());
+                    info!("<-- NewPeer: {from}\n    {peer_name:?}, {at}\n{EOF_EVENT}");
                 }
 
                 if let Err(e) = sender.broadcast(about_me.to_bytes().into()).await {
-                    println!("!!! {} BroadcastError: {e:?}\n{EOF_ERROR}", now());
+                    error!("BroadcastError: {e:?}\n{EOF_ERROR}");
                 }
             }
             Msg::Message { from, text } => {
                 let members = members.read().await;
                 // if it's a `Message` message, get the name from the map and print the message
                 let source = format!("{}, {:?}", from.fmt_short(), members.get(&from));
-                println!("<<< {} Message: {source}\n{}\n{EOF_MESSAGE}", now(), text.trim_end());
+                info!("<<< Message: {source}\n{}\n{EOF_MESSAGE}", text.trim_end());
             }
             Msg::File { from, filename, content } => {
                 let members = members.read().await;
@@ -239,7 +237,7 @@ pub async fn subscribe_loop(
                 let members = members.read().await;
                 // if it's a `Message` message, get the name from the map and print the message
                 let source = format!("{}, {:?}", from.fmt_short(), members.get(&from));
-                println!("<<< {} Share: {source}\n    {ticket} {filename}\n{EOF_MESSAGE}", now(),);
+                info!("<<< Share: {source}\n    {ticket} {filename}\n{EOF_MESSAGE}");
             }
         }
     }

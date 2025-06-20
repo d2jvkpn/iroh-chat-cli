@@ -12,6 +12,7 @@ use iroh::{
 use iroh_gossip::{net::Gossip, proto::TopicId};
 use rand::prelude::*;
 use tokio::sync::RwLock;
+use tracing::{error, info, warn}; // Level, instrument
 
 /// Chat over iroh-gossip
 ///
@@ -102,6 +103,8 @@ async fn main() -> Result<()> {
         .map(RelayMap::from)
         .unwrap_or_else(|| RelayMap::empty());
 
+    utils::init_log("chat", "info");
+
     let endpoint = if relay_map.is_empty() {
         Endpoint::builder() // use default relay url: https://euw1-1.relay.iroh.network
     } else {
@@ -142,23 +145,23 @@ async fn main() -> Result<()> {
     let node_ids = ticket_nodes.iter().map(|p| p.node_id).collect();
 
     if ticket_nodes.is_empty() {
-        println!("--> {} waiting for nodes to join us...", now());
+        info!("waiting for nodes to join us...");
     } else {
         // add the peer addrs from the ticket to our endpoint's addressbook,
         // so that they can be dialed
         for node in ticket_nodes.into_iter() {
             // println!("--> trying to connect to node: {:?}...", node);
             if let Err(e) = endpoint.add_node_addr(node.clone()) {
-                println!("!!! {} can't connect to node: {}, {e:?}", now(), node.node_id);
+                warn!("can't connect to node: {}, {e:?}", node.node_id);
             } else {
-                println!("--> {} connected to node: {}", now(), node.node_id);
+                info!("connected to node: {}", node.node_id);
             }
         }
     }
 
     dbg!(&node_ids);
     let (sender, receiver) = gossip.subscribe_and_join(topic, node_ids).await?.split();
-    println!("--> {} connected!", now());
+    info!("connected!");
 
     let msg = Msg::AboutMe { from: node_id, name: name.clone(), at: now() };
     sender.broadcast(msg.to_vec().into()).await?;
@@ -172,10 +175,13 @@ async fn main() -> Result<()> {
         members.clone(),
     ));
     // broadcast each line we type
-    println!("==> Type a message and hit enter to broadcast...");
-    input_loop(endpoint.clone(), name.clone(), sender.clone(), members).await?;
+    info!("==> Type a message and hit enter to broadcast...");
 
-    println!("<== {} Quit", now());
+    if let Err(e) = input_loop(endpoint.clone(), name.clone(), sender.clone(), members).await {
+        error!("{e:?}");
+    }
+
+    warn!("<== Quit");
     router.shutdown().await?;
     Ok(())
 }
