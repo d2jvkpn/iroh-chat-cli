@@ -33,7 +33,7 @@ async fn main() -> io::Result<()> {
         };
 
         match line {
-            Ok(Some(v)) => println!(">>> YOU: {}", v),
+            Ok(Some(v)) => println!(">>> You: {}", v),
             Ok(None) => println!("<== End of input (EOF). Exiting."),
             Err(e) => eprintln!("!!! Error reading input: {}", e),
         }

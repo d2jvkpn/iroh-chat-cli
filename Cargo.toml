@@ -12,14 +12,20 @@ path = "src/chat.rs"
 name = "a01"
 path = "src/a01.rs"
 
+[[bin]]
+name = "share"
+path = "src/share.rs"
+
 
 [dependencies]
 anyhow = "1"
-base64 = "0.22"
+# base64 = "0.22"
 chrono = { version = "0.4", features = ["serde"] }
 clap = { version = "4", features = ["derive"] }
+data-encoding = "2.9"
 futures-lite = "2.6"
 iroh = "0.35"
+iroh-blobs = "0.35.0"
 iroh-gossip = "0.35"
 rand = "0.9"
 serde = { version = "1", features = ["derive"] }

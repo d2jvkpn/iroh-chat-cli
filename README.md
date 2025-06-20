@@ -44,8 +44,8 @@ How are you today?\r
 :online\r
 ```
 
-5. send a file (max size=32M)
-:send path/to/file\r
+5. send a small file directly (max size=8M)
+:file path/to/file\r
 
 6. quit
 ```

@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 use std::path::Path;
 
-use crate::structs::Ticket;
+use crate::structs::TopicTicket;
 
 use anyhow::{Result, anyhow};
 use iroh::SecretKey;
@@ -50,13 +50,13 @@ pub fn iroh_secret_key() -> SecretKey {
     SecretKey::from_bytes(&buf)
 }
 
-pub async fn write_ticket(ticket: &Ticket, filename: &str) -> Result<()> {
+pub async fn write_topic_ticket(ticket: &TopicTicket, filename: &str) -> Result<()> {
     let node_addr = ticket.nodes.last().ok_or_else(|| anyhow!("nodes is empty"))?;
 
     let dir = Path::new("configs");
     fs::create_dir_all(dir).await?;
 
-    let filepath = dir.join(format!("{}.ticket", filename));
+    let filepath = dir.join(format!("{}.topic.ticket", filename));
     let mut file = File::create(&filepath).await?;
     //file.write_all(&ticket.to_bytes()).await?;
     file.write_all(&ticket.to_bytes()).await?;

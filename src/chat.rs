@@ -1,13 +1,14 @@
 use std::{collections::HashMap, fmt::Debug, str::FromStr, sync::Arc};
 
 use iroh_chat_cli::handlers::{input_loop, subscribe_loop};
-use iroh_chat_cli::structs::{Msg, Ticket};
+use iroh_chat_cli::structs::{Msg, TopicTicket};
 use iroh_chat_cli::utils::{self, now};
 
 use anyhow::Result;
 use clap::{ArgAction, Args, Parser};
-use iroh::protocol::Router;
-use iroh::{Endpoint, NodeAddr, RelayMap, RelayMode, RelayNode, RelayUrl, SecretKey};
+use iroh::{
+    Endpoint, NodeAddr, RelayMap, RelayMode, RelayNode, RelayUrl, SecretKey, protocol::Router,
+};
 use iroh_gossip::{ALPN, net::Gossip, proto::TopicId};
 use rand::prelude::*;
 use tokio::sync::RwLock;
@@ -78,7 +79,7 @@ async fn main() -> Result<()> {
             (topic, vec![])
         }
         Subcommand::Join { ticket } => {
-            let Ticket { topic, nodes } = Ticket::from_str(&ticket)?;
+            let TopicTicket { topic, nodes } = TopicTicket::from_str(&ticket)?;
             println!("==> Joining chat room for topic {topic}");
             (topic, nodes)
         }
@@ -133,8 +134,8 @@ async fn main() -> Result<()> {
 
     all_nodes.push(node_addr);
 
-    let ticket = Ticket { topic, nodes: all_nodes };
-    utils::write_ticket(&ticket, &name).await?;
+    let ticket = TopicTicket { topic, nodes: all_nodes };
+    utils::write_topic_ticket(&ticket, &name).await?;
 
     // join the gossip topic by connecting to known nodes, if any
     let node_ids = ticket_nodes.iter().map(|p| p.node_id).collect();
@@ -162,10 +163,16 @@ async fn main() -> Result<()> {
     sender.broadcast(msg.to_vec().into()).await?;
 
     let members = Arc::new(RwLock::new(HashMap::new()));
-    tokio::spawn(subscribe_loop(node_id, name.clone(), sender.clone(), receiver, members.clone()));
+    tokio::spawn(subscribe_loop(
+        endpoint.clone(),
+        name.clone(),
+        sender.clone(),
+        receiver,
+        members.clone(),
+    ));
     // broadcast each line we type
     println!("==> Type a message and hit enter to broadcast...");
-    input_loop(node_id, name.clone(), sender.clone(), members).await?;
+    input_loop(endpoint.clone(), name.clone(), sender.clone(), members).await?;
 
     println!("<== {} Quit", now());
     router.shutdown().await?;
