@@ -42,6 +42,7 @@ How are you today?\r
 4. quit
 ```
 :quit\r
+```
 
 5. show online accounts
 ```
