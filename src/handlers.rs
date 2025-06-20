@@ -99,7 +99,7 @@ pub async fn input_loop(
                 };
 
                 match sender.broadcast(msg.to_vec().into()).await {
-                    Ok(_) => info!("--> SentFile: {filename}\n{EOF_EVENT}"),
+                    Ok(_) => info!("--> SendFile: {filename}\n{EOF_EVENT}"),
                     Err(e) => error!("SendFile: {filename}, {e:?}\n{EOF_ERROR}"),
                 }
             }
