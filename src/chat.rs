@@ -181,10 +181,10 @@ async fn main() -> Result<()> {
         error!("input_loop: {e:?}");
     }
 
-    warn!("<== Quit");
     if let Err(e) = router.shutdown().await {
         error!("router.shutdown: {e:?}");
     }
 
+    warn!("<== Quit");
     Ok(())
 }
