@@ -12,7 +12,7 @@ version: 0.1.0
 - p2p chat, in rust, from scratch
   https://www.youtube.com/watch?v=ogN_mBkWu7o
 - https://www.iroh.computer/docs/examples/gossip-chat
-- https://www.iroh.computer
+- https://github.com/n0-computer/iroh-blobs/blob/main/examples/transfer.rs
 
 2. run
 ```
