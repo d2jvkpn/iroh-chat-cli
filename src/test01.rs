@@ -18,7 +18,7 @@ fn my_func(x: i32) {
 
 #[tokio::main]
 async fn main() -> io::Result<()> {
-    let _guard = utils::log2file("test01", "info");
+    let _guard = utils::log2file("test01.log", "info");
     // utils::log2stdout("info");
 
     my_func(42);

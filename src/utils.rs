@@ -94,9 +94,9 @@ impl FormatTime for LogTimer {
     }
 }
 
-pub fn log2file(app: &str, level: &str) -> WorkerGuard {
-    let file_appender = rolling::daily("logs", app);
-    let (non_blocking, guard) = tracing_appender::non_blocking(file_appender);
+pub fn log2file(prefix: &str, level: &str) -> WorkerGuard {
+    let appender = rolling::daily("logs", prefix);
+    let (non_blocking, guard) = tracing_appender::non_blocking(appender);
 
     // RUST_LOG=my_app=info,my_app::submod=debug
     // RUST_LOG=tokio=info,my_crate=debug
