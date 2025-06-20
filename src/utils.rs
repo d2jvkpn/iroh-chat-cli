@@ -22,8 +22,8 @@ pub fn load_yaml(path: &str) -> Result<Value> {
     Ok(yaml)
 }
 
-pub fn config_get<'a>(yaml: &'a Value, path: &str) -> Option<&'a Value> {
-    path.split('.').fold(Some(yaml), |acc, key| acc?.get(key))
+pub fn config_get<'a>(value: &'a Value, path: &str) -> Option<&'a Value> {
+    path.split('.').fold(Some(value), |acc, key| acc?.get(key))
 }
 
 pub fn now() -> String {
@@ -85,32 +85,13 @@ pub fn split_first_space(mut s: &str, trim: bool) -> (&str, Option<&str>) {
     }
 }
 
-struct LogTimer;
+struct LogTime;
 
-impl FormatTime for LogTimer {
+impl FormatTime for LogTime {
     fn format_time(&self, w: &mut format::Writer<'_>) -> std::fmt::Result {
         let now = Local::now();
         write!(w, "{}", now.format("%Y-%m-%dT%H:%M:%S%:z"))
     }
-}
-
-pub fn log2file(prefix: &str, level: &str) -> WorkerGuard {
-    let appender = rolling::daily("logs", prefix);
-    let (non_blocking, guard) = tracing_appender::non_blocking(appender);
-
-    // RUST_LOG=my_app=info,my_app::submod=debug
-    // RUST_LOG=tokio=info,my_crate=debug
-    // .with_env_filter(EnvFilter::from_default_env())
-    //  with_max_level(Level::WARN)
-    tracing_subscriber::fmt()
-        .with_timer(LogTimer)
-        .with_target(false)
-        .with_env_filter(EnvFilter::new(level))
-        // .with_writer(non_blocking.and(std::io::stdout))
-        .with_writer(non_blocking)
-        .init();
-
-    guard
 }
 
 pub fn log2stdout(level: &str) {
@@ -119,10 +100,24 @@ pub fn log2stdout(level: &str) {
     // .with_env_filter(EnvFilter::from_default_env())
     //  with_max_level(Level::WARN)
     tracing_subscriber::fmt()
-        .with_timer(LogTimer)
+        .with_timer(LogTime)
         .with_target(false)
         .with_env_filter(EnvFilter::new(level))
         .init();
+}
+
+pub fn log2file(prefix: &str, level: &str) -> WorkerGuard {
+    let appender = rolling::daily("logs", prefix);
+    let (non_blocking, guard) = tracing_appender::non_blocking(appender);
+
+    tracing_subscriber::fmt()
+        .with_timer(LogTime)
+        .with_target(false)
+        .with_env_filter(EnvFilter::new(level))
+        .with_writer(non_blocking) // non_blocking.and(std::io::stdout)
+        .init();
+
+    guard
 }
 
 #[cfg(test)]
