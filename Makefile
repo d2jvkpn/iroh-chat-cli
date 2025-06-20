@@ -6,15 +6,16 @@ secret_key:
 Alice:
 	cargo run --bin chat --  --name Alice open
 
-#Bob:
-#	cargo run --bin chat -- --name Bob join \
-#	  $$(awk 'NR==1{printf $$1}' configs/Alice.topic.ticket | base64 -w0)
-
 Bob:
 	cargo run --bin chat -- --name Bob join \
-	  $$(awk 'NR==1{printf $$1}' configs/Alice.topic.ticket | base32 -w0)
+	  $$(awk 'NR==1{printf $$1}' configs/Alice.topic.ticket | base64 -w0)
 
 John:
 	cargo run --bin chat -- --name John join \
-	  $$(awk 'NR==1{printf $$1}' configs/Bob.topic.ticket | base32 -w0)
+	  $$(awk 'NR==1{printf $$1}' configs/Bob.topic.ticket | base64 -w0)
 
+send_file:
+	cargo run --bin share -- send Cargo.toml
+
+receive_file:
+	cargo run --bin share -- receive $$(cat configs/send_file.bob.ticket) configs/Cargo.toml

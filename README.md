@@ -39,15 +39,24 @@ How are you today?\r
 :me\r
 ```
 
-4. show online accounts
+4. quit
+```
+:quit\r
+
+5. show online accounts
 ```
 :online\r
 ```
 
-5. send a small file directly (max size=8M)
-:file path/to/file\r
+6. send a small file directly (max size=8M)
+:send path/to/file\r
 
-6. quit
+7. share a file (any size)
 ```
-:quit\r
+:share path/to/file\r
+```
+
+8. receive a shared file
+```
+:receive blobs_ticket path/to/save\r
 ```

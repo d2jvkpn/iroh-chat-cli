@@ -71,7 +71,10 @@ pub async fn write_topic_ticket(ticket: &TopicTicket, filename: &str) -> Result<
     Ok(())
 }
 
-pub fn split_first_space(s: &str) -> (&str, Option<&str>) {
+pub fn split_first_space(mut s: &str, trim: bool) -> (&str, Option<&str>) {
+    if trim {
+        s = s.trim();
+    }
     match s.split_once(' ') {
         Some((first, rest)) => (first, Some(rest)),
         None => (s, None), // when no space in s

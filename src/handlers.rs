@@ -1,18 +1,19 @@
-use std::{collections::HashMap, path, sync::Arc};
+use std::{collections::HashMap, sync::Arc};
 
 use crate::structs::{
-    COMMAND_FILE, COMMAND_ME, COMMAND_ONLINE, COMMAND_QUIT, EOF_ERROR, EOF_EVENT, EOF_MESSAGE,
-    MAX_FILESIZE, Message, Msg,
+    COMMAND_ME, COMMAND_ONLINE, COMMAND_QUIT, COMMAND_RECEIVE, COMMAND_SEND, COMMAND_SHARE,
+    EOF_ERROR, EOF_EVENT, EOF_MESSAGE, Message, Msg,
 };
+use crate::transfer::{file_msg, receive_file, save_file, send_file};
 use crate::utils::{self, now};
 
 use anyhow::Result;
 use futures_lite::StreamExt;
-use iroh::{Endpoint, NodeId}; // PublicKey
+use iroh::{Endpoint, NodeId, protocol::Router}; // PublicKey
+use iroh_blobs::{net_protocol::Blobs, ticket::BlobTicket};
 use iroh_gossip::net::{Event, GossipEvent, GossipReceiver, GossipSender};
 use tokio::io::{self, AsyncBufReadExt};
-use tokio::sync::RwLock;
-use tokio::{fs, time};
+use tokio::{sync::RwLock, time};
 
 /// Read input from stdin
 pub async fn input_loop(
@@ -23,6 +24,13 @@ pub async fn input_loop(
 ) -> Result<()> {
     let node_id: NodeId = endpoint.node_id();
     let eol = &['\r', '\n'][..];
+
+    // We initialize the Blobs protocol in-memory
+    let blobs = Blobs::memory().build(&endpoint);
+    // Now we build a router that accepts blobs connections & routes them to the blobs protocol.
+    let _router = Router::builder(endpoint).accept(iroh_blobs::ALPN, blobs.clone()).spawn();
+    // We use a blobs client to interact with the blobs protocol we're running locally:
+    let blobs_client = blobs.client();
 
     /*
     // create a new string buffer
@@ -57,7 +65,7 @@ pub async fn input_loop(
         let text = buffer.trim_end().to_string();
         buffer.clear();
 
-        let (command, _) = utils::split_first_space(&text);
+        let (command, _) = utils::split_first_space(&text, false);
 
         match command {
             COMMAND_QUIT => {
@@ -75,16 +83,72 @@ pub async fn input_loop(
                     println!("  {node_id}: {name:?}")
                 }
             }
-            COMMAND_FILE => {
-                let (_, filename) = utils::split_first_space(&line[COMMAND_FILE.len()..]);
-                let filename = match filename {
-                    Some(v) => v.trim(),
-                    None => {
-                        println!("!!! no input file");
+            COMMAND_SEND => {
+                let (filename, _) = utils::split_first_space(&line[COMMAND_SEND.len()..], true);
+                if filename.is_empty() {
+                    println!("!!! no input file");
+                    continue;
+                };
+
+                let msg = match file_msg(node_id, filename.to_string()).await {
+                    Some(v) => v,
+                    None => continue,
+                };
+
+                match sender.broadcast(msg.to_vec().into()).await {
+                    Ok(_) => println!("--> {} SentFileOK: {filename}\n{EOF_EVENT}", now()),
+                    Err(e) => {
+                        println!("!!! {} SendFileError: {filename}, {e:?}\n{EOF_ERROR}", now())
+                    }
+                }
+            }
+            COMMAND_SHARE => {
+                let (filename, _) = utils::split_first_space(&line[COMMAND_SHARE.len()..], true);
+                if filename.is_empty() {
+                    println!("!!! no input file");
+                    continue;
+                };
+
+                // TODO: async, stop sharing
+                let ticket = match send_file(blobs_client, node_id, filename.to_string()).await {
+                    Ok(v) => v,
+                    Err(e) => {
+                        println!("!!! {} send_file:\n    {filename}, {e:?}\n{EOF_EVENT}", now());
                         continue;
                     }
                 };
-                tokio::spawn(send_file(node_id, sender.clone(), filename.to_string()));
+                println!("--> {} send_file:\n    {ticket} {filename}\n{EOF_EVENT}", now());
+
+                let msg = Msg::Share { from: node_id, filename: filename.to_string(), ticket };
+                match sender.broadcast(msg.to_vec().into()).await {
+                    Ok(_) => println!(">>> {} You({:?})\n{EOF_MESSAGE}", now(), name),
+                    Err(e) => println!("!!! {} BroadcastError: {e:?}\n{EOF_ERROR}", now()),
+                }
+            }
+            COMMAND_RECEIVE => {
+                let (ticket, filename) =
+                    utils::split_first_space(&line[COMMAND_RECEIVE.len()..], true);
+
+                let filename = match filename {
+                    Some(v) => v,
+                    None => {
+                        println!("!!! no filename");
+                        continue;
+                    }
+                };
+
+                let ticket: BlobTicket = match ticket.parse() {
+                    Ok(v) => v,
+                    Err(e) => {
+                        println!("!!! invalid ticket: {e:?}");
+                        continue;
+                    }
+                };
+
+                match receive_file(blobs_client, ticket, filename.to_string()).await {
+                    Ok(_) => println!("<-- {} ReceivedFile: {filename}", now()),
+                    Err(e) => println!("!!! {} ReceivedFile: {filename}, {e:?}", now()),
+                }
             }
             _ => {
                 let msg = Msg::Message { from: node_id, text: text };
@@ -97,59 +161,6 @@ pub async fn input_loop(
     }
 
     Ok(())
-}
-
-pub async fn send_file(node_id: NodeId, sender: GossipSender, filename: String) {
-    let filepath = path::Path::new(&filename);
-
-    if !(filepath.exists() && filepath.is_file()) {
-        println!("!!! invalid input file");
-        return;
-    }
-
-    /*
-    let filepath = match filepath.file_name() {
-        Some(v) => v.to_string_lossy().to_string(),
-        None => {
-            println!("!!! invalid input file");
-            return;
-        }
-    };
-    */
-
-    let metadata = match fs::metadata(&filepath).await {
-        Ok(v) => v,
-        Err(e) => {
-            println!("!!! Failed to read file: {filename}, {e:?}");
-            return;
-        }
-    };
-
-    if metadata.len() > MAX_FILESIZE {
-        println!("!!! File size is large than {MAX_FILESIZE}");
-        return;
-    }
-
-    println!("--> {} SendingFile: {filename}\n{EOF_EVENT}", now());
-
-    //let content = fs::read(filepath).await.map_err(|e| {
-    //    println!("!!! {} Failed to read file: {}, {}", now(), filename, e);
-    //    continue;
-    //})?;
-    let content = match fs::read(&filepath).await {
-        Ok(v) => v,
-        Err(e) => {
-            println!("!!! {} Failed to read file: {filename}, {e:?}\n{EOF_ERROR}", now());
-            return;
-        }
-    };
-
-    let msg = Msg::File { from: node_id, filename: filename.clone(), content };
-
-    match sender.broadcast(msg.to_vec().into()).await {
-        Ok(_) => println!("--> {} SentFileOK: {filename}\n{EOF_EVENT}", now()),
-        Err(e) => println!("!!! {} SendFileError: {filename}, {e:?}\n{EOF_ERROR}", now()),
-    }
 }
 
 pub async fn subscribe_loop(
@@ -178,15 +189,14 @@ pub async fn subscribe_loop(
             }
             Event::Gossip(GossipEvent::NeighborDown(from)) => {
                 let mut members = members.write().await;
-                if let Some((_, name)) = members.remove_entry(&from) {
-                    println!(
-                        "<-- NeighborDown: {name:?}, {:?}, {}\n{EOF_EVENT}",
-                        now(),
-                        from.fmt_short(),
-                    );
-                } else {
-                    println!("<-- {} NeighborDown: UNKNOWN, {}\n{EOF_EVENT}", now(), from);
-                }
+                let peer =
+                    members.remove_entry(&from).unwrap_or_else(|| (from, "UNKNOWN".to_string()));
+                println!(
+                    "<-- {} NeighborDown: {}, {:?}\n{EOF_EVENT}",
+                    now(),
+                    from.fmt_short(),
+                    peer.1,
+                );
                 continue;
             }
             Event::Gossip(GossipEvent::Received(msg)) => msg,
@@ -198,18 +208,18 @@ pub async fn subscribe_loop(
                 let mut members = members.write().await;
                 match members.remove_entry(&from) {
                     Some((_, name)) => {
-                        println!("<-- {} Bye: {name:?}, {}\n{EOF_EVENT}", now(), from.fmt_short())
+                        println!("<-- {} Bye: {}, {name:?}\n{EOF_EVENT}", now(), from.fmt_short())
                     }
-                    None => println!("<-- {} Bye: UNKNOWN, {}\n{EOF_EVENT}", now(), from),
+                    None => println!("<-- {} Bye: {from}, UNKNOWN\n{EOF_EVENT}", now()),
                 }
             }
-            Msg::AboutMe { from, name, at } => {
+            Msg::AboutMe { from, name: peer_name, at } => {
                 let mut members = members.write().await;
                 // if it's an `AboutMe` message add and entry into the map and print the name
                 if !members.contains_key(&from) {
-                    members.insert(from, name.clone());
+                    members.insert(from, peer_name.clone());
                     // println!("<-- Peer: {} is now known as {:?}", from, name);
-                    println!("<-- {} NewPeer: {}, {:?}, {}\n{EOF_EVENT}", now(), from, name, at);
+                    println!("<-- {} NewPeer: {from}\n{peer_name:?}, {at}\n{EOF_EVENT}", now());
                 }
 
                 if let Err(e) = sender.broadcast(about_me.to_bytes().into()).await {
@@ -219,46 +229,32 @@ pub async fn subscribe_loop(
             Msg::Message { from, text } => {
                 let members = members.read().await;
                 // if it's a `Message` message, get the name from the map and print the message
-                let name = members.get(&from).map_or_else(|| from.fmt_short(), String::to_string);
-                println!("<<< {} MsgFrom: {:?}, \n{}\n{EOF_MESSAGE}", now(), name, text.trim_end());
+                let peer_name =
+                    members.get(&from).map_or_else(|| from.fmt_short(), String::to_string);
+                println!(
+                    "<<< {} Message: {peer_name:?}, \n{}\n{EOF_MESSAGE}",
+                    now(),
+                    text.trim_end()
+                );
             }
             Msg::File { from, filename, content } => {
-                tokio::spawn(save_file(from, name.clone(), filename, content));
+                let members = members.read().await;
+                // if it's a `Message` message, get the name from the map and print the message
+                let peer_name =
+                    members.get(&from).map_or_else(|| from.fmt_short(), String::to_string);
+                tokio::spawn(save_file(from, peer_name, filename, content));
+            }
+            Msg::Share { from, filename, ticket } => {
+                let members = members.read().await;
+                // if it's a `Message` message, get the name from the map and print the message
+                let peer_name =
+                    members.get(&from).map_or_else(|| from.fmt_short(), String::to_string);
+                println!(
+                    "<<< {} Share: {peer_name:?}\n    {ticket} {filename}\n{EOF_MESSAGE}",
+                    now(),
+                );
             }
         }
     }
     Ok(())
-}
-
-async fn save_file(from: NodeId, name: String, filename: String, content: Vec<u8>) {
-    let dir = path::Path::new("data").join("downloads");
-
-    let filepath = match path::Path::new(&filename).file_name() {
-        Some(v) => v.to_string_lossy().to_string(),
-        None => {
-            println!("!!!! Invalid filepath: filename");
-            return;
-        }
-    };
-
-    let filepath = dir.join(format!("{}_{}", utils::filename_prefix(), filepath));
-
-    if content.len() > MAX_FILESIZE.try_into().unwrap() {
-        println!("!!! File size is large than {MAX_FILESIZE}");
-        return;
-    }
-
-    if let Err(e) = fs::create_dir_all(dir.clone()).await {
-        println!("!!! Failed to create dir: {filename}, {e:?}");
-        return;
-    }
-
-    println!("<-- {} ReceivedFile: {name:?}, {from}, {filename}\n{EOF_EVENT}", now());
-
-    if let Err(e) = fs::write(&filepath, content).await {
-        println!("!!! Failed to write file: {filename}, {e:?}");
-        return;
-    };
-
-    println!("<-- {} SavedFile: {name:?}, {from}, {filename}\n{EOF_EVENT}", now());
 }

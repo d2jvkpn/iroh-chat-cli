@@ -9,7 +9,7 @@ use clap::{ArgAction, Args, Parser};
 use iroh::{
     Endpoint, NodeAddr, RelayMap, RelayMode, RelayNode, RelayUrl, SecretKey, protocol::Router,
 };
-use iroh_gossip::{ALPN, net::Gossip, proto::TopicId};
+use iroh_gossip::{net::Gossip, proto::TopicId};
 use rand::prelude::*;
 use tokio::sync::RwLock;
 
@@ -125,7 +125,8 @@ async fn main() -> Result<()> {
 
     // The Router is how we manage protocols on top of the iroh endpoint. It handles all incoming
     // messages and routes them to the correct protocol.
-    let router = Router::builder(endpoint.clone()).accept(ALPN, gossip.clone()).spawn();
+    let router =
+        Router::builder(endpoint.clone()).accept(iroh_gossip::ALPN, gossip.clone()).spawn();
 
     // in our main file, after we create a topic `id`:
     // print a ticket that includes our own node id and endpoint addresses
