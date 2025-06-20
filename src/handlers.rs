@@ -123,7 +123,7 @@ pub async fn input_loop(
                 let msg = Msg::Share { from: node_id, filename: filename.to_string(), ticket };
                 match sender.broadcast(msg.to_vec().into()).await {
                     Ok(_) => info!(">>> You({:?})\n{EOF_MESSAGE}", name),
-                    Err(e) => error!("BroadcastError: {e:?}\n{EOF_ERROR}"),
+                    Err(e) => error!("ShareBroadcast: {e:?}\n{EOF_ERROR}"),
                 }
             }
             COMMAND_RECEIVE => {
@@ -155,7 +155,7 @@ pub async fn input_loop(
                 let msg = Msg::Message { from: node_id, text: text };
                 match sender.broadcast(msg.to_vec().into()).await {
                     Ok(_) => info!(">>> You({:?})\n{EOF_MESSAGE}", name),
-                    Err(e) => error!("BroadcastError: {e:?}\n{EOF_ERROR}"),
+                    Err(e) => error!("MsgBroadcast: {e:?}\n{EOF_ERROR}"),
                 }
             }
         }
