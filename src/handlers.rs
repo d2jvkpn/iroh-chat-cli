@@ -176,12 +176,21 @@ pub async fn subscribe_loop(
 
     let get_entry = async |from: &PublicKey| {
         // if it's a `Message` message, get the name from the map and print the message
-        format!("{}, {:?}", from.fmt_short(), members.read().await.get(from))
+        members
+            .read()
+            .await
+            .get(from)
+            .map(|v| format!("{}({v:?})", from.fmt_short()))
+            .unwrap_or_else(|| format!("{from}"))
     };
 
-    let remove_entry = async |from: &PublicKey| match members.write().await.remove_entry(from) {
-        Some(v) => format!("{}, {}", from.fmt_short(), v.1),
-        None => format!("{from}"),
+    let remove_entry = async |from: &PublicKey| {
+        members
+            .write()
+            .await
+            .remove_entry(from)
+            .map(|v| format!("{}({:?})", v.0.fmt_short(), v.1))
+            .unwrap_or_else(|| format!("{from}"))
     };
 
     while let Some(event) = receiver.try_next().await? {
