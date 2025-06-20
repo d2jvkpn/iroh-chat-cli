@@ -23,7 +23,7 @@ base64 = "0.22"
 chrono = { version = "0.4", features = ["serde"] }
 clap = { version = "4", features = ["derive"] }
 # data-encoding = "2.9"
-futures-lite = "2.6"
+futures-lite = "2"
 iroh = "0.35"
 iroh-blobs = "0.35"
 iroh-gossip = "0.35"
