@@ -208,7 +208,7 @@ pub async fn subscribe_loop(
                 let mut members = members.write().await;
                 match members.remove_entry(&from) {
                     Some((_, name)) => {
-                        println!("<-- {} Bye: {}, {name:?}\n{EOF_EVENT}", now(), from.fmt_short())
+                        println!("<-- {} Bye: {}, {name:?}\n{EOF_EVENT}", now(), from.fmt_short());
                     }
                     None => println!("<-- {} Bye: {from}, UNKNOWN\n{EOF_EVENT}", now()),
                 }
@@ -219,7 +219,7 @@ pub async fn subscribe_loop(
                 if !members.contains_key(&from) {
                     members.insert(from, peer_name.clone());
                     // println!("<-- Peer: {} is now known as {:?}", from, name);
-                    println!("<-- {} NewPeer: {from}\n{peer_name:?}, {at}\n{EOF_EVENT}", now());
+                    println!("<-- {} NewPeer: {from}\n    {peer_name:?}, {at}\n{EOF_EVENT}", now());
                 }
 
                 if let Err(e) = sender.broadcast(about_me.to_bytes().into()).await {
@@ -232,7 +232,7 @@ pub async fn subscribe_loop(
                 let peer_name =
                     members.get(&from).map_or_else(|| from.fmt_short(), String::to_string);
                 println!(
-                    "<<< {} Message: {peer_name:?}, \n{}\n{EOF_MESSAGE}",
+                    "<<< {} Message: {peer_name:?}\n{}\n{EOF_MESSAGE}",
                     now(),
                     text.trim_end()
                 );

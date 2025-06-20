@@ -88,7 +88,12 @@ pub async fn save_file(from: NodeId, name: String, filename: String, content: Ve
         return;
     };
 
-    println!("<-- {} SavedFile: {name:?}, {}, {filename}\n{EOF_EVENT}", now(), from.fmt_short());
+    println!(
+        "<-- {} SavedFile: {name:?}, {}, {}\n{EOF_EVENT}",
+        now(),
+        from.fmt_short(),
+        filepath.display(),
+    );
 }
 
 pub async fn send_file(
