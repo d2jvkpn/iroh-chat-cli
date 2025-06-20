@@ -1,7 +1,7 @@
 // https://github.com/n0-computer/iroh-blobs/blob/main/examples/transfer.rs
 use std::process;
 
-use iroh_chat_cli::transfer::{receive_file, send_file};
+use iroh_chat_cli::transfer::{receive_file, share_file};
 
 use anyhow::{Result, anyhow};
 use iroh::{Endpoint, protocol::Router};
@@ -27,11 +27,11 @@ async fn main() -> Result<()> {
     let blobs_client = blobs.client();
 
     match arg_refs.as_slice() {
-        ["send", filename] => {
-            let ticket = send_file(blobs_client, node_id, filename.to_string()).await?;
+        ["share", filename] => {
+            let ticket = share_file(blobs_client, node_id, filename.to_string()).await?;
 
-            fs::write("configs/send_file.bob.ticket", ticket.to_string()).await?;
-            println!("--> File hashed, ticket: {ticket}, configs/send_file.bob.ticket");
+            fs::write("configs/share_file.bob.ticket", ticket.to_string()).await?;
+            println!("--> File hashed, ticket: {ticket}, configs/share_file.bob.ticket");
             // println!("cargo run --example transfer -- receive {ticket} {}", filename.display());
             tokio::signal::ctrl_c().await?;
             router.shutdown().await?;

@@ -1,3 +1,5 @@
+#!/bin/make
+
 SHELL := /bin/bash
 
 secret_key:
@@ -14,8 +16,9 @@ John:
 	cargo run --bin iroch-chat-cli -- --name John join \
 	  $$(awk 'NR==1{printf $$1}' configs/Bob.topic.ticket | base64 -w0)
 
-send_file:
-	cargo run --bin iroch-share-file -- send Cargo.toml
+share_file:
+	cargo run --bin iroch-share-file -- share Cargo.toml
 
 receive_file:
-	cargo run --bin iroch-share-file -- receive $$(cat configs/send_file.bob.ticket) configs/Cargo.toml
+	cargo run --bin iroch-share-file -- receive \
+	  $$(cat configs/send_file.bob.ticket) configs/Cargo.toml

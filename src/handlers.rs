@@ -4,7 +4,7 @@ use crate::structs::{
     COMMAND_ME, COMMAND_ONLINE, COMMAND_QUIT, COMMAND_RECEIVE, COMMAND_SEND, COMMAND_SHARE,
     EOF_ERROR, EOF_EVENT, EOF_MESSAGE, Message, Msg,
 };
-use crate::transfer::{file_msg, receive_file, save_file, send_file};
+use crate::transfer::{receive_file, save_file, send_file, share_file};
 use crate::utils::{self, now};
 
 use anyhow::Result;
@@ -90,14 +90,17 @@ pub async fn input_loop(
                     continue;
                 };
 
-                let msg = match file_msg(node_id, filename.to_string()).await {
-                    Some(v) => v,
-                    None => continue,
+                let msg = match send_file(node_id, filename.to_string()).await {
+                    Ok(v) => v,
+                    Err(e) => {
+                        error!("SendFile: filename, {e:?}\n{EOF_ERROR}");
+                        continue;
+                    }
                 };
 
                 match sender.broadcast(msg.to_vec().into()).await {
-                    Ok(_) => info!("--> SentFileOK: {filename}\n{EOF_EVENT}"),
-                    Err(e) => error!("SendFileError: {filename}, {e:?}\n{EOF_ERROR}"),
+                    Ok(_) => info!("--> SentFile: {filename}\n{EOF_EVENT}"),
+                    Err(e) => error!("SendFile: {filename}, {e:?}\n{EOF_ERROR}"),
                 }
             }
             COMMAND_SHARE => {
@@ -108,14 +111,14 @@ pub async fn input_loop(
                 };
 
                 // TODO: async, stop sharing
-                let ticket = match send_file(blobs_client, node_id, filename.to_string()).await {
+                let ticket = match share_file(blobs_client, node_id, filename.to_string()).await {
                     Ok(v) => v,
                     Err(e) => {
-                        error!("send_file:\n    {filename}, {e:?}\n{EOF_EVENT}");
+                        error!("ShareFile:\n{filename}, {e:?}\n{EOF_EVENT}");
                         continue;
                     }
                 };
-                info!("--> send_file:\n    {ticket} {filename}\n{EOF_EVENT}");
+                info!("--> ShareFile:\n{ticket} {filename}\n{EOF_EVENT}");
 
                 let msg = Msg::Share { from: node_id, filename: filename.to_string(), ticket };
                 match sender.broadcast(msg.to_vec().into()).await {
@@ -228,11 +231,17 @@ pub async fn subscribe_loop(
             }
             Msg::File { from, filename, content } => {
                 let entry = get_entry(&from).await;
-                tokio::spawn(save_file(entry, filename, content));
+                // tokio::spawn(save_file(entry, filename, content));
+                tokio::spawn(async move {
+                    match save_file(filename.clone(), content).await {
+                        Ok(_) => info!("<-- SavedFile: {entry}, {filename}\n{EOF_EVENT}"),
+                        Err(e) => error!("SaveFile: {entry}, {filename}, {e:?}\n{EOF_EVENT}"),
+                    }
+                });
             }
             Msg::Share { from, filename, ticket } => {
                 let entry = get_entry(&from).await;
-                info!("<<< Share: {entry}\n{ticket} {filename}\n{EOF_MESSAGE}");
+                info!("<-- Share: {entry}\n{ticket} {filename}\n{EOF_MESSAGE}");
             }
         }
     }
