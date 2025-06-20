@@ -2,18 +2,18 @@
 name = "iroh-chat-cli"
 version = "0.1.0"
 edition = "2024"
-default-run = "chat"
+default-run = "iroch-chat-cli"
 
 [[bin]]
-name = "chat"
+name = "iroch-chat-cli"
 path = "src/chat.rs"
 
 [[bin]]
-name = "a01"
-path = "src/a01.rs"
+name = "t01"
+path = "src/t01.rs"
 
 [[bin]]
-name = "share"
+name = "iroch-share-file"
 path = "src/share.rs"
 
 
@@ -25,13 +25,13 @@ clap = { version = "4", features = ["derive"] }
 # data-encoding = "2.9"
 futures-lite = "2.6"
 iroh = "0.35"
-iroh-blobs = "0.35.0"
+iroh-blobs = "0.35"
 iroh-gossip = "0.35"
 rand = "0.9"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 serde_yaml = "0.9"
-tokio = "1.45"
+tokio = "1"
 tracing = "0.1"
 tracing-appender = "0.2"
 tracing-subscriber = { version = "0.3", features = ["fmt", "time"] }
