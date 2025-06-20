@@ -78,6 +78,7 @@ pub async fn input_loop(
             COMMAND_ME => println!("ME: {}, {}", name, node_id),
             COMMAND_ONLINE => {
                 let members = members.read().await;
+
                 println!("members:");
                 for (node_id, name) in members.iter() {
                     println!("  {node_id}: {name:?}")
@@ -141,7 +142,7 @@ pub async fn input_loop(
                 let ticket: BlobTicket = match ticket.parse() {
                     Ok(v) => v,
                     Err(e) => {
-                        error!("invalid ticket: {e:?}");
+                        warn!("invalid ticket: {e:?}");
                         continue;
                     }
                 };
