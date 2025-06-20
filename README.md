@@ -50,7 +50,9 @@ How are you today?\r
 ```
 
 6. send a small file directly (max size=8M)
+```
 :send path/to/file\r
+```
 
 7. share a file (any size)
 ```
