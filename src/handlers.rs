@@ -9,7 +9,7 @@ use crate::utils::{self, now};
 
 use anyhow::Result;
 use futures_lite::StreamExt;
-use iroh::{Endpoint, NodeId, protocol::Router}; // PublicKey
+use iroh::{Endpoint, NodeId, PublicKey, protocol::Router};
 use iroh_blobs::{net_protocol::Blobs, ticket::BlobTicket};
 use iroh_gossip::net::{Event, GossipEvent, GossipReceiver, GossipSender};
 use tokio::io::{self, AsyncBufReadExt};
@@ -171,6 +171,16 @@ pub async fn subscribe_loop(
     let node_id: NodeId = endpoint.node_id();
     let about_me = Message::new(Msg::AboutMe { from: node_id, name: name.to_string(), at: now() });
 
+    let get_entry = async |from: &PublicKey| {
+        // if it's a `Message` message, get the name from the map and print the message
+        format!("{}, {:?}", from.fmt_short(), members.read().await.get(from))
+    };
+
+    let remove_entry = async |from: &PublicKey| match members.write().await.remove_entry(from) {
+        Some(v) => format!("{}, {}", from.fmt_short(), v.1),
+        None => format!("{from}"),
+    };
+
     while let Some(event) = receiver.try_next().await? {
         let msg = match event {
             Event::Lagged => {
@@ -186,13 +196,8 @@ pub async fn subscribe_loop(
                 continue;
             }
             Event::Gossip(GossipEvent::NeighborDown(from)) => {
-                let mut members = members.write().await;
-                let source = match members.remove_entry(&from) {
-                    Some(v) => format!("{}, {}", from.fmt_short(), v.1),
-                    None => format!("{from}"),
-                };
-                // members.remove_entry(&from).unwrap_or_else(|| (from, "UNKNOWN".to_string()));
-                info!("<-- NeighborDown: {source}\n{EOF_EVENT}");
+                let entry = remove_entry(&from).await;
+                info!("<-- NeighborDown: {entry}\n{EOF_EVENT}");
                 continue;
             }
             Event::Gossip(GossipEvent::Received(msg)) => msg,
@@ -201,12 +206,8 @@ pub async fn subscribe_loop(
         // deserialize the message and match on the message type:
         match Message::from_bytes(&msg.content)?.msg {
             Msg::Bye { from, at: _ } => {
-                let mut members = members.write().await;
-                let source = match members.remove_entry(&from) {
-                    Some(v) => format!("{}, {}", from.fmt_short(), v.1),
-                    None => format!("{from}"),
-                };
-                warn!("<-- Bye: {source}\n{EOF_EVENT}");
+                let entry = remove_entry(&from).await;
+                warn!("<-- Bye: {entry}\n{EOF_EVENT}");
             }
             Msg::AboutMe { from, name: peer_name, at } => {
                 let mut members = members.write().await;
@@ -214,7 +215,7 @@ pub async fn subscribe_loop(
                 if !members.contains_key(&from) {
                     members.insert(from, peer_name.clone());
                     // println!("<-- Peer: {} is now known as {:?}", from, name);
-                    info!("<-- NewPeer: {from}\n    {peer_name:?}, {at}\n{EOF_EVENT}");
+                    info!("<-- NewPeer: {from}\n{peer_name:?}, {at}\n{EOF_EVENT}");
                 }
 
                 if let Err(e) = sender.broadcast(about_me.to_bytes().into()).await {
@@ -222,22 +223,16 @@ pub async fn subscribe_loop(
                 }
             }
             Msg::Message { from, text } => {
-                let members = members.read().await;
-                // if it's a `Message` message, get the name from the map and print the message
-                let source = format!("{}, {:?}", from.fmt_short(), members.get(&from));
-                info!("<<< Message: {source}\n{}\n{EOF_MESSAGE}", text.trim_end());
+                let entry = get_entry(&from).await;
+                info!("<<< Message: {entry}\n{}\n{EOF_MESSAGE}", text.trim_end());
             }
             Msg::File { from, filename, content } => {
-                let members = members.read().await;
-                // if it's a `Message` message, get the name from the map and print the message
-                let source = format!("{}, {:?}", from.fmt_short(), members.get(&from));
-                tokio::spawn(save_file(source, filename, content));
+                let entry = get_entry(&from).await;
+                tokio::spawn(save_file(entry, filename, content));
             }
             Msg::Share { from, filename, ticket } => {
-                let members = members.read().await;
-                // if it's a `Message` message, get the name from the map and print the message
-                let source = format!("{}, {:?}", from.fmt_short(), members.get(&from));
-                info!("<<< Share: {source}\n    {ticket} {filename}\n{EOF_MESSAGE}");
+                let entry = get_entry(&from).await;
+                info!("<<< Share: {entry}\n{ticket} {filename}\n{EOF_MESSAGE}");
             }
         }
     }
