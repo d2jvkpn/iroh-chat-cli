@@ -11,7 +11,7 @@ use anyhow::Result;
 use futures_lite::StreamExt;
 use iroh::{Endpoint, NodeId, PublicKey, protocol::Router};
 use iroh_blobs::{net_protocol::Blobs, ticket::BlobTicket};
-use iroh_gossip::net::{Event, GossipEvent, GossipReceiver, GossipSender};
+use iroh_gossip::net::{self, Event, GossipEvent, GossipReceiver, GossipSender};
 use tokio::io::{self, AsyncBufReadExt};
 use tokio::{sync::RwLock, time};
 use tracing::{error, info, warn}; // Level, instrument
@@ -75,7 +75,7 @@ pub async fn input_loop(
                 time::sleep(time::Duration::from_millis(100)).await;
                 break;
             }
-            COMMAND_ME => println!("ME: {}, {}", name, node_id),
+            COMMAND_ME => println!("ME: {node_id}, {name}"),
             COMMAND_ONLINE => {
                 let members = members.read().await;
 
@@ -195,7 +195,7 @@ pub async fn subscribe_loop(
     };
 
     while let Some(event) = receiver.try_next().await? {
-        let msg = match event {
+        let msg: net::Message = match event {
             Event::Lagged => {
                 warn!("<-- Lagged\n{EOF_EVENT}");
                 continue;
@@ -213,11 +213,19 @@ pub async fn subscribe_loop(
                 info!("<-- NeighborDown: {entry}\n{EOF_EVENT}");
                 continue;
             }
-            Event::Gossip(GossipEvent::Received(msg)) => msg,
+            Event::Gossip(GossipEvent::Received(v)) => v,
+        };
+
+        let msg: Msg = match Message::from_bytes(&msg.content) {
+            Ok(v) => v.msg,
+            Err(e) => {
+                error!("unknown message content: {e:?}, {:?}", &msg.content);
+                continue;
+            }
         };
 
         // deserialize the message and match on the message type:
-        match Message::from_bytes(&msg.content)?.msg {
+        match msg {
             Msg::Bye { from, at: _ } => {
                 let entry = remove_entry(&from).await;
                 warn!("<-- Bye: {entry}\n{EOF_EVENT}");
@@ -255,5 +263,6 @@ pub async fn subscribe_loop(
             }
         }
     }
+
     Ok(())
 }

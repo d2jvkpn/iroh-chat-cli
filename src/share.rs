@@ -31,7 +31,7 @@ async fn main() -> Result<()> {
             let ticket = share_file(blobs_client, node_id, filename.to_string()).await?;
 
             fs::write("configs/share_file.bob.ticket", ticket.to_string()).await?;
-            println!("--> File hashed, ticket: {ticket}, configs/share_file.bob.ticket");
+            println!("--> sharing_file: {ticket} configs/share_file.bob.ticket");
             // println!("cargo run --example transfer -- receive {ticket} {}", filename.display());
             tokio::signal::ctrl_c().await?;
             router.shutdown().await?;
@@ -39,7 +39,7 @@ async fn main() -> Result<()> {
         ["receive", ticket, filename] => {
             let ticket: BlobTicket = ticket.parse()?;
             receive_file(blobs_client, ticket, filename.to_string()).await?;
-            println!("<-- Saved file: {filename}.");
+            println!("<-- received_file: {filename}");
         }
         _ => return Err(anyhow!("!!! Couldn't parse command line arguments: {args:?}")),
     }

@@ -3,7 +3,11 @@
 SHELL := /bin/bash
 
 secret_key:
-	head -c 32 /dev/urandom | xxd -p -c 32
+	# head -c 32 /dev/urandom | xxd -p -c 32
+	head -c 32 /dev/urandom | base64
+
+test01:
+	cargo run --bin test01
 
 Alice:
 	cargo run --bin iroch-chat-cli --  --name Alice open

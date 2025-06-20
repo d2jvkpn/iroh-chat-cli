@@ -103,7 +103,7 @@ async fn main() -> Result<()> {
         .map(RelayMap::from)
         .unwrap_or_else(|| RelayMap::empty());
 
-    utils::init_log("chat", "info");
+    utils::log2stdout("info");
 
     let endpoint = if relay_map.is_empty() {
         Endpoint::builder() // use default relay url: https://euw1-1.relay.iroh.network

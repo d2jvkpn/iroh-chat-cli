@@ -1,4 +1,4 @@
-use std::process;
+use std::{process, thread};
 
 use iroh_chat_cli::utils;
 
@@ -9,12 +9,17 @@ use tracing::{error, info, instrument, warn}; // Level
 
 #[instrument]
 fn my_func(x: i32) {
-    info!("Running my_func with x = {}", x);
+    info!("running my_func with x = {}", x);
+
+    thread::sleep(std::time::Duration::from_millis(42));
+
+    info!("exit my_func");
 }
 
 #[tokio::main]
 async fn main() -> io::Result<()> {
-    utils::init_log("a01", "info");
+    let _guard = utils::log2file("test01", "info");
+    // utils::log2stdout("info");
 
     my_func(42);
     warn!("warning message with local time");

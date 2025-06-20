@@ -9,8 +9,8 @@ name = "iroch-chat-cli"
 path = "src/chat.rs"
 
 [[bin]]
-name = "t01"
-path = "src/t01.rs"
+name = "test01"
+path = "src/test01.rs"
 
 [[bin]]
 name = "iroch-share-file"

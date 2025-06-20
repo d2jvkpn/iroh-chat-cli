@@ -12,9 +12,9 @@ use serde_yaml::Value;
 use tokio::fs::{self, File};
 use tokio::io::AsyncWriteExt;
 // use tracing::{error, info, instrument, warn}; // Level
-use tracing_appender::rolling;
+use tracing_appender::{non_blocking::WorkerGuard, rolling}; // non_blocking::NonBlocking
 use tracing_subscriber::EnvFilter;
-use tracing_subscriber::fmt::{format, time::FormatTime, writer::MakeWriterExt};
+use tracing_subscriber::fmt::{format, time::FormatTime}; // writer::MakeWriterExt
 
 pub fn load_yaml(path: &str) -> Result<Value> {
     let contents = std::fs::read_to_string(path)?;
@@ -42,10 +42,10 @@ pub fn iroh_secret_key() -> SecretKey {
     // Endpoint::builder().secret_key(secret_key.clone()).discovery_n0().bind().await?;
     // dbg!(&secret_key);
 
-    //let yaml = load_yaml(&args.config).await?;
-    //let secret_key = config_get(&yaml, "iroh.secret_key").and_then(|v| v.as_str()).unwrap();
-    //let secret_key = SecretKey::from_str(secret_key).unwrap();
-    //let endpoint = Endpoint::builder().secret_key(secret_key).discovery_n0().bind().await?;
+    // let yaml = load_yaml(&args.config).await?;
+    // let secret_key = config_get(&yaml, "iroh.secret_key").and_then(|v| v.as_str()).unwrap();
+    // let secret_key = SecretKey::from_str(secret_key).unwrap();
+    // let endpoint = Endpoint::builder().secret_key(secret_key).discovery_n0().bind().await?;
 
     let mut rng = rand::rng();
     let mut buf = [0u8; 32];
@@ -94,9 +94,9 @@ impl FormatTime for LogTimer {
     }
 }
 
-pub fn init_log(app: &str, level: &str) {
+pub fn log2file(app: &str, level: &str) -> WorkerGuard {
     let file_appender = rolling::daily("logs", app);
-    let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
+    let (non_blocking, guard) = tracing_appender::non_blocking(file_appender);
 
     // RUST_LOG=my_app=info,my_app::submod=debug
     // RUST_LOG=tokio=info,my_crate=debug
@@ -106,7 +106,22 @@ pub fn init_log(app: &str, level: &str) {
         .with_timer(LogTimer)
         .with_target(false)
         .with_env_filter(EnvFilter::new(level))
-        .with_writer(non_blocking.and(std::io::stdout))
+        // .with_writer(non_blocking.and(std::io::stdout))
+        .with_writer(non_blocking)
+        .init();
+
+    guard
+}
+
+pub fn log2stdout(level: &str) {
+    // RUST_LOG=my_app=info,my_app::submod=debug
+    // RUST_LOG=tokio=info,my_crate=debug
+    // .with_env_filter(EnvFilter::from_default_env())
+    //  with_max_level(Level::WARN)
+    tracing_subscriber::fmt()
+        .with_timer(LogTimer)
+        .with_target(false)
+        .with_env_filter(EnvFilter::new(level))
         .init();
 }
 
