@@ -159,7 +159,7 @@ async fn main() -> Result<()> {
         }
     }
 
-    dbg!(&node_ids);
+    // dbg!(&node_ids);
     let (sender, receiver) = gossip.subscribe_and_join(topic, node_ids).await?.split();
     info!("connected!");
 
@@ -178,10 +178,13 @@ async fn main() -> Result<()> {
     info!("==> Type a message and hit enter to broadcast...");
 
     if let Err(e) = input_loop(endpoint.clone(), name.clone(), sender.clone(), members).await {
-        error!("{e:?}");
+        error!("input_loop: {e:?}");
     }
 
     warn!("<== Quit");
-    router.shutdown().await?;
+    if let Err(e) = router.shutdown().await {
+        error!("router.shutdown: {e:?}");
+    }
+
     Ok(())
 }
