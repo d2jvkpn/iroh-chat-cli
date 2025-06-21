@@ -32,6 +32,13 @@ fn main() -> std::io::Result<()> {
                 writeln!(stdout, "Ctrl+C pressed, exiting.")?;
                 break;
             }
+            KeyCode::Char('s') if key_event.modifiers.contains(KeyModifiers::CONTROL) => {
+                // ?? can't use Ctrl+Enter
+                write!(stdout, "\n")?;
+                execute!(stdout, MoveToColumn(0), Clear(ClearType::CurrentLine))?;
+                writeln!(stdout, "Ctrl+S pressed, sending.")?;
+                break;
+            }
             KeyCode::Char(c) => {
                 buffer.insert(cursor_pos, c);
                 cursor_pos += 1;
@@ -58,14 +65,14 @@ fn main() -> std::io::Result<()> {
                 }
             }
             KeyCode::Enter => {
-                println!("");
+                write!(stdout, "\n")?;
                 buffer.clear();
                 cursor_pos = 0;
             }
             _ => {}
         }
 
-        execute!(stdout, MoveToColumn(0), Clear(ClearType::CurrentLine),)?;
+        execute!(stdout, MoveToColumn(0), Clear(ClearType::CurrentLine))?;
         write!(stdout, "> {}", buffer)?;
         execute!(stdout, MoveToColumn((cursor_pos + 2) as u16))?;
         stdout.flush()?;
