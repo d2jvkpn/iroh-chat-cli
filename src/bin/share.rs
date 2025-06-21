@@ -6,6 +6,7 @@ use iroh::{Endpoint, protocol::Router};
 use iroh_blobs::{net_protocol::Blobs, ticket::BlobTicket};
 use tokio::fs;
 use tracing::{error, info}; // Level, instrument, warn
+use tracing_subscriber::EnvFilter;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -14,7 +15,8 @@ async fn main() -> Result<()> {
     // Convert to &str, so we can pattern-match easily:
     let arg_refs: Vec<&str> = args.iter().map(String::as_str).collect();
 
-    utils::log2stdout(module_path!(), "info");
+    let filter = EnvFilter::new(format!("{0}=info,{0}::handlers=info", module_path!()));
+    utils::log2stdout(filter);
 
     // Create an endpoint, it allows creating and accepting connections in the iroh p2p world
     let endpoint = Endpoint::builder().discovery_n0().bind().await?;

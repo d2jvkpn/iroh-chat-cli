@@ -71,31 +71,19 @@ impl FormatTime for LogTime {
     }
 }
 
-// info, myapp=info
-pub fn log2stdout(app: &str, level: &str) {
+// EnvFilter::new("info"), EnvFilter::new("myapp=info")
+pub fn log2stdout(filter: EnvFilter) {
     // RUST_LOG=my_app=info,my_app::submod=debug
     // RUST_LOG=tokio=info,my_crate=debug
     // .with_env_filter(EnvFilter::from_default_env())
     //  with_max_level(Level::WARN)
 
-    let filter = if app.is_empty() {
-        EnvFilter::new(level)
-    } else {
-        EnvFilter::new(format!("{app}={level}"))
-    };
-
     tracing_subscriber::fmt().with_timer(LogTime).with_target(false).with_env_filter(filter).init();
 }
 
-pub fn log2file(app: &str, level: &str) -> WorkerGuard {
+pub fn log2file(app: &str, filter: EnvFilter) -> WorkerGuard {
     let appender = rolling::daily("logs", app);
     let (non_blocking, guard) = tracing_appender::non_blocking(appender);
-
-    let filter = if app.is_empty() {
-        EnvFilter::new(level)
-    } else {
-        EnvFilter::new(format!("{app}={level}"))
-    };
 
     tracing_subscriber::fmt()
         .with_timer(LogTime)

@@ -13,6 +13,7 @@ use iroh_gossip::{net::Gossip, proto::TopicId};
 use rand::prelude::*;
 use tokio::{fs, io::AsyncWriteExt, sync::RwLock};
 use tracing::{error, info, warn}; // Level, instrument
+use tracing_subscriber::EnvFilter;
 
 /// Chat over iroh-gossip
 ///
@@ -73,8 +74,8 @@ async fn main() -> Result<()> {
     let args = Command::parse();
     let name = args.name.clone();
 
-    utils::log2stdout(module_path!(), "info");
-    // utils::log2stdout("iroh_chat_cli", "info");
+    let filter = EnvFilter::new(format!("{0}=info,{0}::handlers=info", module_path!()));
+    utils::log2stdout(filter);
 
     let (topic, ticket_nodes) = match &args.subcommand {
         Subcommand::Open => {
