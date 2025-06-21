@@ -27,6 +27,7 @@ fn main() -> std::io::Result<()> {
 
         match key_event.code {
             KeyCode::Char('c') if key_event.modifiers.contains(KeyModifiers::CONTROL) => {
+                write!(stdout, "\n")?;
                 execute!(stdout, MoveToColumn(0), Clear(ClearType::CurrentLine))?;
                 writeln!(stdout, "Ctrl+C pressed, exiting.")?;
                 break;
@@ -69,6 +70,7 @@ fn main() -> std::io::Result<()> {
         execute!(stdout, MoveToColumn((cursor_pos + 2) as u16))?;
         stdout.flush()?;
     }
+
     execute!(stdout, MoveToColumn(0), Clear(ClearType::CurrentLine))?;
     execute!(stdout, Show)?;
 
