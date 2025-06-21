@@ -4,8 +4,8 @@ use crate::structs::{
     COMMAND_ME, COMMAND_ONLINE, COMMAND_QUIT, COMMAND_RECEIVE, COMMAND_SEND, COMMAND_SHARE,
     EOF_EVENT, EOF_MESSAGE, Message, Msg,
 };
-use crate::transfer::{receive_file, save_file, send_file, share_file};
-use crate::utils::{self, now};
+use crate::transfer::{receive_file, share_file};
+use crate::utils::{content_to_file, now, read_file_to_send, split_first_space};
 
 use anyhow::Result;
 use futures_lite::StreamExt;
@@ -52,20 +52,20 @@ pub async fn input_loop(
      */
 
     let mut reader = io::BufReader::new(io::stdin()).lines();
-    let mut buffer = String::new();
+    let mut lines = String::new();
 
     while let Some(line) = reader.next_line().await? {
         if line.trim_end_matches(eol).ends_with(' ') {
-            buffer.push_str(line.trim_end());
-            buffer.push('\n');
+            lines.push_str(line.trim_end());
+            lines.push('\n');
             continue;
         }
 
-        buffer.push_str(&line);
-        let text = buffer.trim_end().to_string();
-        buffer.clear();
+        lines.push_str(&line);
+        let text = lines.trim_end().to_string();
+        lines.clear();
 
-        let (command, _) = utils::split_first_space(&text, false);
+        let (command, _) = split_first_space(&text, false);
 
         match command {
             COMMAND_QUIT => {
@@ -85,27 +85,28 @@ pub async fn input_loop(
                 }
             }
             COMMAND_SEND => {
-                let (filename, _) = utils::split_first_space(&line[COMMAND_SEND.len()..], true);
-                if filename.is_empty() {
+                let (filepath, _) = split_first_space(&line[COMMAND_SEND.len()..], true);
+                if filepath.is_empty() {
                     warn!("no input file");
                     continue;
                 };
 
-                let msg = match send_file(node_id, filename.to_string()).await {
-                    Ok(v) => v,
+                let filename = filepath.to_string();
+                let msg = match read_file_to_send(&filename).await {
+                    Ok(content) => Msg::File { from: node_id, filename, content },
                     Err(e) => {
-                        error!("SendFile: filename, {e:?}\n{EOF_EVENT}");
+                        error!("SendFile: {filepath}, {e:?}\n{EOF_EVENT}");
                         continue;
                     }
                 };
 
                 match sender.broadcast(msg.to_vec().into()).await {
-                    Ok(_) => info!("--> SendFile: {filename}\n{EOF_EVENT}"),
-                    Err(e) => error!("SendFile: {filename}, {e:?}\n{EOF_EVENT}"),
+                    Ok(_) => info!("--> SendFile: {filepath}\n{EOF_EVENT}"),
+                    Err(e) => error!("SendFile: {filepath}, {e:?}\n{EOF_EVENT}"),
                 }
             }
             COMMAND_SHARE => {
-                let (filename, _) = utils::split_first_space(&line[COMMAND_SHARE.len()..], true);
+                let (filename, _) = split_first_space(&line[COMMAND_SHARE.len()..], true);
                 if filename.is_empty() {
                     warn!("no input file");
                     continue;
@@ -128,8 +129,7 @@ pub async fn input_loop(
                 }
             }
             COMMAND_RECEIVE => {
-                let (ticket, filename) =
-                    utils::split_first_space(&line[COMMAND_RECEIVE.len()..], true);
+                let (ticket, filename) = split_first_space(&line[COMMAND_RECEIVE.len()..], true);
 
                 let filename = match filename {
                     Some(v) => v,
@@ -148,12 +148,13 @@ pub async fn input_loop(
                 };
 
                 match receive_file(blobs_client, ticket, filename.to_string()).await {
-                    Ok(_) => info!("<-- ReceivedFile: {filename}"),
-                    Err(e) => error!("ReceivedFile: {filename}, {e:?}"),
+                    Ok(_) => info!("<-- ReceivedFile: {filename}\n{EOF_EVENT}"),
+                    Err(e) => error!("ReceivedFile: {filename}, {e:?}\n{EOF_EVENT}"),
                 }
             }
             _ => {
                 let msg = Msg::Message { from: node_id, text: text };
+
                 match sender.broadcast(msg.to_vec().into()).await {
                     Ok(_) => info!(">>> You({:?})\n{EOF_MESSAGE}", name),
                     Err(e) => error!("BroadcastMsg: {e:?}\n{EOF_MESSAGE}"),
@@ -251,7 +252,7 @@ pub async fn subscribe_loop(
                 let entry = get_entry(&from).await;
                 // tokio::spawn(save_file(entry, filename, content));
                 tokio::spawn(async move {
-                    match save_file(filename.clone(), content).await {
+                    match content_to_file(content, &filename).await {
                         Ok(_) => info!("<-- SavedFile: {entry}, {filename}\n{EOF_EVENT}"),
                         Err(e) => error!("SaveFile: {entry}, {filename}, {e:?}\n{EOF_EVENT}"),
                     }

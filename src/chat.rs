@@ -1,17 +1,18 @@
-use std::{collections::HashMap, fmt::Debug, str::FromStr, sync::Arc};
+use std::{collections::HashMap, fmt::Debug, path, str::FromStr, sync::Arc};
 
 use iroh_chat_cli::handlers::{input_loop, subscribe_loop};
 use iroh_chat_cli::structs::{Msg, TopicTicket};
 use iroh_chat_cli::utils::{self, now};
 
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use clap::{ArgAction, Args, Parser};
 use iroh::{
     Endpoint, NodeAddr, RelayMap, RelayMode, RelayNode, RelayUrl, SecretKey, protocol::Router,
 };
 use iroh_gossip::{net::Gossip, proto::TopicId};
 use rand::prelude::*;
-use tokio::sync::RwLock;
+use tokio::fs::{self, File};
+use tokio::{io::AsyncWriteExt, sync::RwLock};
 use tracing::{error, info, warn}; // Level, instrument
 
 /// Chat over iroh-gossip
@@ -139,7 +140,7 @@ async fn main() -> Result<()> {
     all_nodes.push(node_addr);
 
     let ticket = TopicTicket { topic, nodes: all_nodes };
-    utils::write_topic_ticket(&ticket, &name).await?;
+    write_topic_ticket(&ticket, &name).await?;
 
     // join the gossip topic by connecting to known nodes, if any
     let node_ids = ticket_nodes.iter().map(|p| p.node_id).collect();
@@ -186,5 +187,26 @@ async fn main() -> Result<()> {
     }
 
     warn!("<== Quit");
+    Ok(())
+}
+
+pub async fn write_topic_ticket(ticket: &TopicTicket, filename: &str) -> Result<()> {
+    let node_addr = ticket.nodes.last().ok_or_else(|| anyhow!("nodes is empty"))?;
+
+    let dir = path::Path::new("configs");
+    fs::create_dir_all(dir).await?;
+
+    let filepath = dir.join(format!("{}.topic.ticket", filename));
+    let mut file = File::create(&filepath).await?;
+    //file.write_all(&ticket.to_bytes()).await?;
+    file.write_all(&ticket.to_bytes()).await?;
+    file.write_all(b"\n").await?;
+    // println!("--> node: {node_addr:?}\n    ticket: {ticket}");
+    println!("--> node_id: {}", node_addr.node_id);
+    println!("    filepath: {}", filepath.display());
+    println!("    relay_url: {:?}", node_addr.relay_url());
+    println!("    direct_addresses: {:?}", node_addr.direct_addresses().collect::<Vec<_>>());
+    println!("    ticket: {ticket}");
+
     Ok(())
 }

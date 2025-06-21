@@ -1,7 +1,6 @@
-#![allow(dead_code)]
-use std::path::Path;
+use std::path;
 
-use crate::structs::TopicTicket;
+use crate::structs::MAX_FILESIZE;
 
 use anyhow::{Result, anyhow};
 use iroh::SecretKey;
@@ -9,8 +8,7 @@ use iroh::SecretKey;
 use chrono::{Local, SecondsFormat};
 use rand::prelude::*;
 use serde_yaml::Value;
-use tokio::fs::{self, File};
-use tokio::io::AsyncWriteExt;
+use tokio::fs;
 // use tracing::{error, info, instrument, warn}; // Level
 use tracing_appender::{non_blocking::WorkerGuard, rolling}; // non_blocking::NonBlocking
 use tracing_subscriber::EnvFilter;
@@ -31,7 +29,7 @@ pub fn now() -> String {
     return now.to_rfc3339_opts(SecondsFormat::Millis, true);
 }
 
-pub fn filename_prefix() -> String {
+pub fn timestamp_prefix() -> String {
     let now = Local::now();
     return now.format("%Y-%m-%d-%s").to_string();
 }
@@ -52,27 +50,6 @@ pub fn iroh_secret_key() -> SecretKey {
     rng.fill_bytes(&mut buf);
 
     SecretKey::from_bytes(&buf)
-}
-
-pub async fn write_topic_ticket(ticket: &TopicTicket, filename: &str) -> Result<()> {
-    let node_addr = ticket.nodes.last().ok_or_else(|| anyhow!("nodes is empty"))?;
-
-    let dir = Path::new("configs");
-    fs::create_dir_all(dir).await?;
-
-    let filepath = dir.join(format!("{}.topic.ticket", filename));
-    let mut file = File::create(&filepath).await?;
-    //file.write_all(&ticket.to_bytes()).await?;
-    file.write_all(&ticket.to_bytes()).await?;
-    file.write_all(b"\n").await?;
-    // println!("--> node: {node_addr:?}\n    ticket: {ticket}");
-    println!("--> node_id: {}", node_addr.node_id);
-    println!("    filepath: {}", filepath.display());
-    println!("    relay_url: {:?}", node_addr.relay_url());
-    println!("    direct_addresses: {:?}", node_addr.direct_addresses().collect::<Vec<_>>());
-    println!("    ticket: {ticket}");
-
-    Ok(())
 }
 
 pub fn split_first_space(mut s: &str, trim: bool) -> (&str, Option<&str>) {
@@ -118,6 +95,61 @@ pub fn log2file(prefix: &str, level: &str) -> WorkerGuard {
         .init();
 
     guard
+}
+
+pub async fn read_file_to_send(filename: &str) -> Result<Vec<u8>> {
+    let filepath = path::Path::new(&filename);
+
+    if !(filepath.exists() && filepath.is_file()) {
+        return Err(anyhow!("invalid input file"));
+    }
+
+    /*
+    let filepath = match filepath.file_name() {
+        Some(v) => v.to_string_lossy().to_string(),
+        None => {
+            println!("!!! invalid input file");
+            return;
+        }
+    };
+    */
+
+    let metadata =
+        fs::metadata(&filepath).await.map_err(|e| anyhow!("failed to read file, {e:?}"))?;
+
+    if metadata.len() > MAX_FILESIZE {
+        return Err(anyhow!("file size is large than {MAX_FILESIZE}"));
+    }
+
+    // info!("--> SendingFile: {filename}\n{EOF_EVENT}");
+
+    //let content = fs::read(filepath).await.map_err(|e| {
+    //    println!("!!! {} Failed to read file: {}, {}", now(), filename, e);
+    //    continue;
+    //})?;
+
+    fs::read(&filepath).await.map_err(|e| anyhow!("failed to write file, {e:?}"))
+}
+
+pub async fn content_to_file(content: Vec<u8>, filename: &str) -> Result<()> {
+    let dir = path::Path::new("data").join("downloads");
+
+    // info!("<-- ReceivingFile: {source}, {filename}\n{EOF_EVENT}");
+    let filepath = match path::Path::new(filename).file_name() {
+        Some(v) => v.to_string_lossy().to_string(),
+        None => return Err(anyhow!("invalid filepath")),
+    };
+
+    let filepath = dir.join(format!("{}_{}", timestamp_prefix(), filepath));
+
+    if content.len() > MAX_FILESIZE.try_into().unwrap() {
+        return Err(anyhow!("file size is too large than {MAX_FILESIZE}"));
+    }
+
+    fs::create_dir_all(dir.clone()).await.map_err(|e| anyhow!("failed to create dir, {e:?}"))?;
+    fs::write(&filepath, content).await.map(|e| anyhow!("failed to write file, {e:?}"))?;
+
+    Ok(())
 }
 
 #[cfg(test)]
