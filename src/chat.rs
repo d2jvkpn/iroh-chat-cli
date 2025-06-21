@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt::Debug, path, str::FromStr, sync::Arc};
+use std::{collections::HashMap, fmt::Debug, path, str::FromStr};
 
 use iroh_chat_cli::handlers::{input_loop, subscribe_loop};
 use iroh_chat_cli::structs::{Msg, TopicTicket};
@@ -11,8 +11,7 @@ use iroh::{
 };
 use iroh_gossip::{net::Gossip, proto::TopicId};
 use rand::prelude::*;
-use tokio::fs::{self, File};
-use tokio::{io::AsyncWriteExt, sync::RwLock};
+use tokio::{fs, io::AsyncWriteExt, sync::RwLock};
 use tracing::{error, info, warn}; // Level, instrument
 
 /// Chat over iroh-gossip
@@ -25,15 +24,6 @@ use tracing::{error, info, warn}; // Level, instrument
 #[derive(Parser, Debug)]
 #[command(name = "iroh-gossip-cli", version = "1.0", about = "p2p chat inrust from scratch")]
 struct Command {
-    #[clap(subcommand)]
-    subcommand: Subcommand,
-
-    #[clap(short, long)] // default_value = "configs/local.yaml"
-    config: Option<String>,
-
-    #[clap(short, long)]
-    relay_url: Option<String>,
-
     /*
     /// Set the bind port for our socket. By default, a random port will be used.
     #[clap(short, long, default_value = "0")]
@@ -42,6 +32,15 @@ struct Command {
     /// Set your nickname.
     #[clap(short, long)]
     name: String,
+
+    #[clap(short, long)]
+    relay_url: Option<String>,
+
+    #[clap(short, long)] // default_value = "configs/local.yaml"
+    config: Option<String>,
+
+    #[clap(subcommand)]
+    subcommand: Subcommand,
 }
 
 #[derive(Parser, Debug)]
@@ -74,6 +73,9 @@ async fn main() -> Result<()> {
     let args = Command::parse();
     let name = args.name.clone();
 
+    utils::log2stdout(module_path!(), "info");
+    // utils::log2stdout("iroh_chat_cli", "info");
+
     let (topic, ticket_nodes) = match &args.subcommand {
         Subcommand::Open => {
             let topic = TopicId::from_bytes(rand::random());
@@ -103,8 +105,6 @@ async fn main() -> Result<()> {
         .map(RelayNode::from)
         .map(RelayMap::from)
         .unwrap_or_else(|| RelayMap::empty());
-
-    utils::log2stdout("info");
 
     let endpoint = if relay_map.is_empty() {
         Endpoint::builder() // use default relay url: https://euw1-1.relay.iroh.network
@@ -160,14 +160,14 @@ async fn main() -> Result<()> {
         }
     }
 
-    // dbg!(&node_ids);
+    dbg!(&node_ids);
     let (sender, receiver) = gossip.subscribe_and_join(topic, node_ids).await?.split();
     info!("connected!");
 
     let msg = Msg::AboutMe { from: node_id, name: name.clone(), at: now() };
     sender.broadcast(msg.to_vec().into()).await?;
 
-    let members = Arc::new(RwLock::new(HashMap::new()));
+    let members = std::sync::Arc::new(RwLock::new(HashMap::new()));
     tokio::spawn(subscribe_loop(
         endpoint.clone(),
         name.clone(),
@@ -197,7 +197,7 @@ pub async fn write_topic_ticket(ticket: &TopicTicket, filename: &str) -> Result<
     fs::create_dir_all(dir).await?;
 
     let filepath = dir.join(format!("{}.topic.ticket", filename));
-    let mut file = File::create(&filepath).await?;
+    let mut file = fs::File::create(&filepath).await?;
     //file.write_all(&ticket.to_bytes()).await?;
     file.write_all(&ticket.to_bytes()).await?;
     file.write_all(b"\n").await?;

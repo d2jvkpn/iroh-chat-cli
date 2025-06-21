@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
 
 use crate::structs::{
     COMMAND_ME, COMMAND_ONLINE, COMMAND_QUIT, COMMAND_RECEIVE, COMMAND_SEND, COMMAND_SHARE,
@@ -21,10 +21,12 @@ pub async fn input_loop(
     endpoint: Endpoint,
     name: String,
     sender: GossipSender,
-    members: Arc<RwLock<HashMap<NodeId, String>>>,
+    members: std::sync::Arc<RwLock<HashMap<NodeId, String>>>,
 ) -> Result<()> {
     let node_id: NodeId = endpoint.node_id();
     let eol = &['\r', '\n'][..];
+
+    // println!("module_path = {}", module_path!());
 
     // We initialize the Blobs protocol in-memory
     let blobs = Blobs::memory().build(&endpoint);
@@ -171,7 +173,7 @@ pub async fn subscribe_loop(
     name: String,
     sender: GossipSender,
     mut receiver: GossipReceiver,
-    members: Arc<RwLock<HashMap<NodeId, String>>>,
+    members: std::sync::Arc<RwLock<HashMap<NodeId, String>>>,
 ) -> Result<()> {
     let node_id: NodeId = endpoint.node_id();
     let about_me = Message::new(Msg::AboutMe { from: node_id, name: name.to_string(), at: now() });

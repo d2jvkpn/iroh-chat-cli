@@ -1,6 +1,3 @@
-// https://github.com/n0-computer/iroh-blobs/blob/main/examples/transfer.rs
-use std::process;
-
 use iroh_chat_cli::transfer::{receive_file, share_file};
 use iroh_chat_cli::utils;
 
@@ -17,6 +14,8 @@ async fn main() -> Result<()> {
     // Convert to &str, so we can pattern-match easily:
     let arg_refs: Vec<&str> = args.iter().map(String::as_str).collect();
 
+    utils::log2stdout(module_path!(), "info");
+
     // Create an endpoint, it allows creating and accepting connections in the iroh p2p world
     let endpoint = Endpoint::builder().discovery_n0().bind().await?;
     let node_id = endpoint.node_id(); // router.endpoint().node_id();
@@ -27,8 +26,6 @@ async fn main() -> Result<()> {
     let router = Router::builder(endpoint).accept(iroh_blobs::ALPN, blobs.clone()).spawn();
     // We use a blobs client to interact with the blobs protocol we're running locally:
     let blobs_client = blobs.client();
-
-    utils::log2stdout("info");
 
     match arg_refs.as_slice() {
         ["share", filename] => {
@@ -51,11 +48,11 @@ async fn main() -> Result<()> {
         }
         _ => {
             error!("couldn't parse command line arguments: {args:?}");
-            process::exit(1);
+            std::process::exit(1);
         }
     }
 
     info!("<== Exit");
-    process::exit(0);
+    std::process::exit(0);
     //Ok(())
 }
