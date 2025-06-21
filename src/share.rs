@@ -32,8 +32,9 @@ async fn main() -> Result<()> {
 
     match arg_refs.as_slice() {
         ["share", filename] => {
-            let ticket = share_file(blobs_client, node_id, filename.to_string()).await?;
+            let ticket = share_file(blobs_client, node_id, filename).await?;
 
+            fs::create_dir_all("configs").await?;
             fs::write("configs/share_file.bob.ticket", ticket.to_string()).await?;
             info!("==> SharingFile: {ticket}");
 
@@ -50,6 +51,7 @@ async fn main() -> Result<()> {
         }
         _ => {
             error!("couldn't parse command line arguments: {args:?}");
+            process::exit(1);
         }
     }
 

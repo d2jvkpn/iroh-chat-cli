@@ -10,7 +10,7 @@ use tokio::fs;
 pub async fn share_file(
     blobs_client: &MemClient,
     node_id: NodeId,
-    filename: String,
+    filename: &str,
 ) -> Result<BlobTicket> {
     let filepath: path::PathBuf = filename.parse()?;
     let filepath = path::absolute(&filepath)?;

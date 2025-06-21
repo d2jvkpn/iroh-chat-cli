@@ -113,7 +113,7 @@ pub async fn input_loop(
                 };
 
                 // TODO: async, stop sharing
-                let ticket = match share_file(blobs_client, node_id, filename.to_string()).await {
+                let ticket = match share_file(blobs_client, node_id, filename).await {
                     Ok(v) => v,
                     Err(e) => {
                         error!("ShareFile:\n{filename}, {e:?}\n{EOF_EVENT}");
