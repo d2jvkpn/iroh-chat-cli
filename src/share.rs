@@ -2,11 +2,13 @@
 use std::process;
 
 use iroh_chat_cli::transfer::{receive_file, share_file};
+use iroh_chat_cli::utils;
 
-use anyhow::{Result, anyhow};
+use anyhow::Result;
 use iroh::{Endpoint, protocol::Router};
 use iroh_blobs::{net_protocol::Blobs, ticket::BlobTicket};
 use tokio::fs;
+use tracing::{error, info}; // Level, instrument, warn
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -26,26 +28,32 @@ async fn main() -> Result<()> {
     // We use a blobs client to interact with the blobs protocol we're running locally:
     let blobs_client = blobs.client();
 
+    utils::log2stdout("info");
+
     match arg_refs.as_slice() {
         ["share", filename] => {
             let ticket = share_file(blobs_client, node_id, filename.to_string()).await?;
 
             fs::write("configs/share_file.bob.ticket", ticket.to_string()).await?;
-            println!("--> sharing_file: {ticket} configs/share_file.bob.ticket");
-            // println!("cargo run --example transfer -- receive {ticket} {}", filename.display());
+            info!("==> SharingFile: {ticket}");
+
             tokio::signal::ctrl_c().await?;
+            println!("");
+            // Gracefully shut down the node
             router.shutdown().await?;
         }
         ["receive", ticket, filename] => {
             let ticket: BlobTicket = ticket.parse()?;
+            info!("<-- receiving_file: {filename}");
             receive_file(blobs_client, ticket, filename.to_string()).await?;
-            println!("<-- received_file: {filename}");
+            info!("<-- received_file: {filename}");
         }
-        _ => return Err(anyhow!("!!! Couldn't parse command line arguments: {args:?}")),
+        _ => {
+            error!("couldn't parse command line arguments: {args:?}");
+        }
     }
 
-    // Gracefully shut down the node
-    println!("<= Shutting down.");
+    info!("<== Exit");
     process::exit(0);
     //Ok(())
 }

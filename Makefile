@@ -25,4 +25,4 @@ share_file:
 
 receive_file:
 	cargo run --bin iroch-share-file -- receive \
-	  $$(cat configs/send_file.bob.ticket) configs/Cargo.toml
+	  $$(cat configs/share_file.bob.ticket) configs/Cargo.toml
