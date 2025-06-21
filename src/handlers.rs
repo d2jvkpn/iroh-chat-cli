@@ -2,7 +2,7 @@ use std::{collections::HashMap, sync::Arc};
 
 use crate::structs::{
     COMMAND_ME, COMMAND_ONLINE, COMMAND_QUIT, COMMAND_RECEIVE, COMMAND_SEND, COMMAND_SHARE,
-    EOF_ERROR, EOF_EVENT, EOF_MESSAGE, Message, Msg,
+    EOF_EVENT, EOF_MESSAGE, Message, Msg,
 };
 use crate::transfer::{receive_file, save_file, send_file, share_file};
 use crate::utils::{self, now};
@@ -94,14 +94,14 @@ pub async fn input_loop(
                 let msg = match send_file(node_id, filename.to_string()).await {
                     Ok(v) => v,
                     Err(e) => {
-                        error!("SendFile: filename, {e:?}\n{EOF_ERROR}");
+                        error!("SendFile: filename, {e:?}\n{EOF_EVENT}");
                         continue;
                     }
                 };
 
                 match sender.broadcast(msg.to_vec().into()).await {
                     Ok(_) => info!("--> SendFile: {filename}\n{EOF_EVENT}"),
-                    Err(e) => error!("SendFile: {filename}, {e:?}\n{EOF_ERROR}"),
+                    Err(e) => error!("SendFile: {filename}, {e:?}\n{EOF_EVENT}"),
                 }
             }
             COMMAND_SHARE => {
@@ -124,7 +124,7 @@ pub async fn input_loop(
                 let msg = Msg::Share { from: node_id, filename: filename.to_string(), ticket };
                 match sender.broadcast(msg.to_vec().into()).await {
                     Ok(_) => info!(">>> You({:?})\n{EOF_MESSAGE}", name),
-                    Err(e) => error!("BroadcastShare: {e:?}\n{EOF_ERROR}"),
+                    Err(e) => error!("BroadcastShare: {e:?}\n{EOF_EVENT}"),
                 }
             }
             COMMAND_RECEIVE => {
@@ -156,7 +156,7 @@ pub async fn input_loop(
                 let msg = Msg::Message { from: node_id, text: text };
                 match sender.broadcast(msg.to_vec().into()).await {
                     Ok(_) => info!(">>> You({:?})\n{EOF_MESSAGE}", name),
-                    Err(e) => error!("BroadcastMsg: {e:?}\n{EOF_ERROR}"),
+                    Err(e) => error!("BroadcastMsg: {e:?}\n{EOF_MESSAGE}"),
                 }
             }
         }
@@ -226,9 +226,9 @@ pub async fn subscribe_loop(
 
         // deserialize the message and match on the message type:
         match msg {
-            Msg::Bye { from, at: _ } => {
+            Msg::Bye { from, at } => {
                 let entry = remove_entry(&from).await;
-                warn!("<-- Bye: {entry}\n{EOF_EVENT}");
+                warn!("<-- Bye: {entry}\n{at}\n{EOF_EVENT}");
             }
             Msg::AboutMe { from, name: peer_name, at } => {
                 let mut members = members.write().await;
@@ -240,7 +240,7 @@ pub async fn subscribe_loop(
                 }
 
                 if let Err(e) = sender.broadcast(about_me.to_bytes().into()).await {
-                    error!("BroadcastAbountMe: {e:?}\n{EOF_ERROR}");
+                    error!("BroadcastAbountMe: {e:?}\n{EOF_EVENT}");
                 }
             }
             Msg::Message { from, text } => {

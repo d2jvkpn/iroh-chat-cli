@@ -19,7 +19,6 @@ pub const MAX_FILESIZE: u64 = 8 * 1024 * 1024;
 
 pub const EOF_MESSAGE: &str = "--------------------------------";
 pub const EOF_EVENT: &str = "++++++++++++++++++++++++++++++++";
-pub const EOF_ERROR: &str = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum Msg {
