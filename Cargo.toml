@@ -6,23 +6,23 @@ default-run = "iroch-chat-cli"
 
 [[bin]]
 name = "test01"
-path = "src/test01.rs"
+path = "src/bin/test01.rs"
 
 [[bin]]
 name = "test02"
-path = "src/test02.rs"
+path = "src/bin/test02.rs"
 
 [[bin]]
 name = "test03"
-path = "src/test03.rs"
+path = "src/bin/test03.rs"
 
 [[bin]]
 name = "iroch-chat-cli"
-path = "src/chat.rs"
+path = "src/bin/chat.rs"
 
 [[bin]]
 name = "iroch-share-file"
-path = "src/share.rs"
+path = "src/bin/share.rs"
 
 
 [dependencies]
