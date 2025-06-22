@@ -25,7 +25,7 @@ pub enum Msg {
     AboutMe { from: NodeId, name: String, at: String },
     Message { from: NodeId, text: String },
     File { from: NodeId, filename: String, content: Vec<u8> },
-    Share { from: NodeId, filename: String, ticket: BlobTicket },
+    Share { from: NodeId, filename: String, size: u64, ticket: BlobTicket },
     Bye { from: NodeId, at: String },
 }
 

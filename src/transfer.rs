@@ -1,6 +1,6 @@
 use std::path;
 
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use iroh::NodeId;
 use iroh_blobs::rpc::client::blobs::{MemClient, WrapOption};
 use iroh_blobs::store::{ExportFormat, ExportMode};
@@ -11,9 +11,13 @@ pub async fn share_file(
     blobs_client: &MemClient,
     node_id: NodeId,
     filename: &str,
-) -> Result<BlobTicket> {
+) -> Result<(u64, BlobTicket)> {
     let filepath: path::PathBuf = filename.parse()?;
     let filepath = path::absolute(&filepath)?;
+
+    if !(filepath.exists() && filepath.is_file()) {
+        return Err(anyhow!("invalid input file"));
+    }
 
     // println!("==> Hashing file: {filename}");
 
@@ -28,7 +32,7 @@ pub async fn share_file(
     // let node_id = router.endpoint().node_id();
     let ticket = BlobTicket::new(node_id.into(), blob.hash, blob.format)?;
 
-    Ok(ticket)
+    Ok((blob.size, ticket))
 }
 
 pub async fn receive_file(

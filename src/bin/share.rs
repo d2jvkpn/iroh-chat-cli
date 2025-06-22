@@ -31,11 +31,11 @@ async fn main() -> Result<()> {
 
     match arg_refs.as_slice() {
         ["share", filename] => {
-            let ticket = share_file(blobs_client, node_id, filename).await?;
+            let (size, ticket) = share_file(blobs_client, node_id, filename).await?;
 
             fs::create_dir_all("configs").await?;
             fs::write("configs/share_file.bob.ticket", ticket.to_string()).await?;
-            info!("==> SharingFile: {ticket}");
+            info!("==> SharingFile: size={size},\n{ticket} {filename}");
 
             tokio::signal::ctrl_c().await?;
             println!("");

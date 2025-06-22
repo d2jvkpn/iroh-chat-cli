@@ -85,11 +85,12 @@ pub async fn input_loop(
                 for (node_id, name) in members.iter() {
                     println!("  {node_id}: {name:?}")
                 }
+                info!("{EOF_EVENT}");
             }
             COMMAND_SEND => {
                 let (filepath, _) = split_first_space(&line[COMMAND_SEND.len()..], true);
                 if filepath.is_empty() {
-                    warn!("no input file");
+                    warn!("no input file\n{EOF_EVENT}");
                     continue;
                 };
 
@@ -110,21 +111,22 @@ pub async fn input_loop(
             COMMAND_SHARE => {
                 let (filename, _) = split_first_space(&line[COMMAND_SHARE.len()..], true);
                 if filename.is_empty() {
-                    warn!("no input file");
+                    warn!("no input file\n{EOF_EVENT}");
                     continue;
                 };
 
                 // TODO: async, stop sharing
-                let ticket = match share_file(blobs_client, node_id, filename).await {
+                let (size, ticket) = match share_file(blobs_client, node_id, filename).await {
                     Ok(v) => v,
                     Err(e) => {
                         error!("ShareFile:\n{filename}, {e:?}\n{EOF_EVENT}");
                         continue;
                     }
                 };
-                info!("--> ShareFile:\n{ticket} {filename}\n{EOF_EVENT}");
+                info!("--> ShareFile: size={size}\n{ticket} {filename}\n{EOF_EVENT}");
 
-                let msg = Msg::Share { from: node_id, filename: filename.to_string(), ticket };
+                let msg =
+                    Msg::Share { from: node_id, filename: filename.to_string(), size, ticket };
                 match sender.broadcast(msg.to_vec().into()).await {
                     Ok(_) => info!(">>> You({:?})\n{EOF_MESSAGE}", name),
                     Err(e) => error!("BroadcastShare: {e:?}\n{EOF_EVENT}"),
@@ -136,7 +138,7 @@ pub async fn input_loop(
                 let filename = match filename {
                     Some(v) => v,
                     None => {
-                        warn!("no filename");
+                        warn!("no filename\n{EOF_EVENT}");
                         continue;
                     }
                 };
@@ -144,7 +146,7 @@ pub async fn input_loop(
                 let ticket: BlobTicket = match ticket.parse() {
                     Ok(v) => v,
                     Err(e) => {
-                        warn!("invalid ticket: {e:?}");
+                        warn!("invalid ticket: {e:?}\n{EOF_EVENT}");
                         continue;
                     }
                 };
@@ -263,9 +265,9 @@ pub async fn subscribe_loop(
                     }
                 });
             }
-            Msg::Share { from, filename, ticket } => {
+            Msg::Share { from, filename, size, ticket } => {
                 let entry = get_entry(&from).await;
-                info!("<-- Share: {entry}\n{ticket} {filename}\n{EOF_MESSAGE}");
+                info!("<-- Share: {entry}, size={size}\n{ticket} {filename}\n{EOF_MESSAGE}");
             }
         }
     }
