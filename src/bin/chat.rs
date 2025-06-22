@@ -23,6 +23,8 @@ const BUILD_INFO: &str = concat!(
     env!("GIT_BRANCH"),
     "\n  git_commit_hash: ",
     env!("GIT_COMMIT_HASH"),
+    "\n  git_commit_time: ",
+    env!("GIT_COMMIT_TIME"),
     "\n"
 );
 
