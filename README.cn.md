@@ -7,7 +7,7 @@ version: 0.1.0
 ```
 
 
-#### ch01. docs and run
+#### ch01. 文档与运行
 1. docs
 - p2p chat, in rust, from scratch
   https://www.youtube.com/watch?v=ogN_mBkWu7o
@@ -25,48 +25,46 @@ cargo run --bin iroh-chat-cli -- --name John join <ticket>  # make John
 ```
 cargo run --bin iroh-share-file -- share <filepath>             # make share_file, share a file
 cargo run --bin iroh-share-file -- receive <ticket> <filepath>  # make receive_file, receive a file
-```
+``
 
+#### ch02. 聊天
+1. 发送单行消息
+```text
+Hello\r
 
-#### ch02. chatting
-1. send an oneline message
-```
-Hello\n
-```
-
-2. send a multiline message (keep a space at the end of line)
+2. 发送多行消息（每行末尾保留一个空格）
 ```
 Hello \n
 I'm Alice. \n
 How are you today?\n
 ```
 
-3. show me
+3. 查看当前用户信息
 ```
 :me\n
 ```
 
-4. quit
+4. 退出聊天
 ```
 :quit\n
 ```
 
-5. show online accounts
+5. 查看当前在线用户
 ```
 :online\n
 ```
 
-6. send a small file directly (max size=8M)
+6. 直接发送一个小文件（最大支持 8MB）
 ```
 :send path/to/file\n
 ```
 
-7. share a file (any size)
+7. 分享一个任意大小的文件
 ```
 :share path/to/file\n
 ```
 
-8. receive a shared file
+8. 接收一个被分享的文件
 ```
 :receive blobs_ticket path/to/save\n
 ```

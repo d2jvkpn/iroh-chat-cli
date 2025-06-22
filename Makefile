@@ -20,7 +20,7 @@ Bob:
 	  $$(cat configs/Alice.topic.ticket)
 
 John:
-	cargo run --bin iroh-chat-cli -- --name John -w configs/Bob.John.ticket join \
+	cargo run --bin iroh-chat-cli -- --name John -w configs/John.topic.ticket join \
 	  $$(cat configs/Bob.topic.ticket)
 
 share_file:
