@@ -15,6 +15,17 @@ use tokio::{fs, io::AsyncWriteExt, sync::RwLock};
 use tracing::{error, info, warn}; // Level, instrument
 use tracing_subscriber::EnvFilter;
 
+const BUILD_INFO: &str = concat!(
+    "\nBuildInfo: \n",
+    "\n  build_time: ",
+    env!("BUILD_TIME"),
+    "  git_branch: ",
+    env!("GIT_BRANCH"),
+    "\n  git_commit_hash: ",
+    env!("GIT_COMMIT_HASH"),
+    "\n"
+);
+
 /// Chat over iroh-gossip
 ///
 /// This broadcasts unsigned messages over iroh-gossip.
@@ -23,7 +34,7 @@ use tracing_subscriber::EnvFilter;
 ///
 /// By default, we use the default n0 discovery services to dial by `NodeId`.
 #[derive(Parser, Debug)]
-#[command(name = "iroh-gossip-cli", version = "1.0", about = "p2p chat inrust from scratch")]
+#[command(name = "iroh-gossip-cli", version = "1.0", about = "p2p chat inrust from scratch", after_help = BUILD_INFO)]
 struct Command {
     /*
     /// Set the bind port for our socket. By default, a random port will be used.

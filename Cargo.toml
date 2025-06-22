@@ -24,6 +24,8 @@ path = "src/bin/chat.rs"
 name = "iroh-share-file"
 path = "src/bin/share.rs"
 
+[build-dependencies]
+chrono = "0.4"
 
 [dependencies]
 anyhow = "1"
