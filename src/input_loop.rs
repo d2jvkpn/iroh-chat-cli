@@ -142,6 +142,7 @@ pub async fn input_loop(
 
                 let msg =
                     Msg::Share { from: node_id, filename: filename.to_string(), size, ticket };
+
                 match sender.broadcast(msg.to_vec().into()).await {
                     Ok(_) => info!(">>> You({:?})\n{EOF_MESSAGE}", name),
                     Err(e) => error!("BroadcastShare: {e:?}\n{EOF_EVENT}"),

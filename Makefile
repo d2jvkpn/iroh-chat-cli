@@ -3,8 +3,9 @@
 SHELL := /bin/bash
 
 secret_key:
-	head -c 32 /dev/urandom | xxd -p -c 32
-	head -c 32 /dev/urandom | base64
+	head -c 32 /dev/urandom | base32 | tr 'A-Z' 'a-z' | sed 's/=*$//'
+	#head -c 32 /dev/urandom | base64
+	#head -c 32 /dev/urandom | xxd -p -c 32
 
 test01:
 	cargo run --bin test01
