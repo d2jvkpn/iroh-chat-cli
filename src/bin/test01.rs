@@ -4,6 +4,7 @@ use tokio::io::{self, AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::signal;
 use tokio::time::{Duration, timeout};
 use tracing::{error, info, instrument, warn}; // Level
+use tracing_subscriber::EnvFilter;
 
 #[instrument]
 fn my_func(x: i32) {
@@ -18,7 +19,7 @@ fn my_func(x: i32) {
 #[tokio::main]
 async fn main() -> io::Result<()> {
     // let _guard = utils::log2file("test01.log", "info");
-    utils::log2stdout(module_path!(), "info");
+    utils::log2stdout(EnvFilter::new(format!("{}={}", module_path!(), "info")));
 
     my_func(42);
     warn!("warning message with local time");

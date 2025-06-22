@@ -71,6 +71,11 @@ impl TopicTicket {
     pub fn to_bytes(&self) -> Vec<u8> {
         serde_json::to_vec(self).expect("serde_json::to_vec is infallible")
     }
+
+    pub fn base64_bytes(&self) -> Vec<u8> {
+        let bts = serde_json::to_vec(self).expect("serde_json::to_vec is infallible");
+        general_purpose::STANDARD.encode(bts).into()
+    }
 }
 
 impl fmt::Display for TopicTicket {

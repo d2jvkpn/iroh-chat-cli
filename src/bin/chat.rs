@@ -34,11 +34,17 @@ struct Command {
     #[clap(short, long)]
     name: String,
 
-    #[clap(short, long)]
+    #[clap(long)]
     relay_url: Option<String>,
+
+    #[arg(short, long)]
+    write_ticket: Option<String>,
 
     #[clap(short, long)] // default_value = "configs/local.yaml"
     config: Option<String>,
+
+    #[arg(long)]
+    verbose: bool,
 
     #[clap(subcommand)]
     subcommand: Subcommand,
@@ -47,7 +53,9 @@ struct Command {
 #[derive(Parser, Debug)]
 enum Subcommand {
     /// Open a chat room for a topic and print a ticket for others to join.
+    // Open,
     Open,
+
     /// Join a chat room from a ticket.
     Join {
         /// The ticket, as base64 string.
@@ -74,7 +82,11 @@ async fn main() -> Result<()> {
     let args = Command::parse();
     let name = args.name.clone();
 
-    let filter = EnvFilter::new(format!("{0}=info,{0}::handlers=info", module_path!()));
+    let filter = if args.verbose {
+        EnvFilter::new("debug")
+    } else {
+        EnvFilter::new(format!("{0}=info,{0}::handlers=info", module_path!()))
+    };
     utils::log2stdout(filter);
 
     let (topic, ticket_nodes) = match &args.subcommand {
@@ -86,6 +98,7 @@ async fn main() -> Result<()> {
         Subcommand::Join { ticket } => {
             let TopicTicket { topic, nodes } = TopicTicket::from_str(&ticket)?;
             println!("==> Joining chat room for topic {topic}");
+            println!("    nodes_in_ticket: {nodes:?}");
             (topic, nodes)
         }
     };
@@ -141,7 +154,9 @@ async fn main() -> Result<()> {
     all_nodes.push(node_addr);
 
     let ticket = TopicTicket { topic, nodes: all_nodes };
-    write_topic_ticket(&ticket, &name).await?;
+    if let Some(v) = args.write_ticket {
+        write_topic_ticket(&ticket, &v).await?;
+    }
 
     // join the gossip topic by connecting to known nodes, if any
     let node_ids = ticket_nodes.iter().map(|p| p.node_id).collect();
@@ -194,13 +209,17 @@ async fn main() -> Result<()> {
 pub async fn write_topic_ticket(ticket: &TopicTicket, filename: &str) -> Result<()> {
     let node_addr = ticket.nodes.last().ok_or_else(|| anyhow!("nodes is empty"))?;
 
-    let dir = path::Path::new("configs");
-    fs::create_dir_all(dir).await?;
+    // fs::create_dir_all(dir).await?;
+    // let filepath = dir.join(format!("{}.topic.ticket", filename));
 
-    let filepath = dir.join(format!("{}.topic.ticket", filename));
+    let filepath = path::Path::new(filename);
+    if let Some(p) = filepath.parent() {
+        fs::create_dir_all(p).await?;
+    }
+
     let mut file = fs::File::create(&filepath).await?;
-    //file.write_all(&ticket.to_bytes()).await?;
-    file.write_all(&ticket.to_bytes()).await?;
+    // file.write_all(&ticket.to_bytes()).await?;
+    file.write_all(&ticket.base64_bytes()).await?;
     file.write_all(b"\n").await?;
     // println!("--> node: {node_addr:?}\n    ticket: {ticket}");
     println!("--> node_id: {}", node_addr.node_id);
