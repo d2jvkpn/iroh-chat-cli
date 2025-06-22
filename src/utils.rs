@@ -129,7 +129,7 @@ pub async fn read_file_to_send(filename: &str) -> Result<Vec<u8>> {
     fs::read(&filepath).await.map_err(|e| anyhow!("failed to write file, {e:?}"))
 }
 
-pub async fn content_to_file(content: Vec<u8>, filename: &str) -> Result<()> {
+pub async fn content_to_file(content: Vec<u8>, filename: &str) -> Result<String> {
     let dir = path::Path::new("data").join("downloads");
 
     // info!("<-- ReceivingFile: {source}, {filename}\n{EOF_EVENT}");
@@ -147,7 +147,7 @@ pub async fn content_to_file(content: Vec<u8>, filename: &str) -> Result<()> {
     fs::create_dir_all(dir.clone()).await.map_err(|e| anyhow!("failed to create dir, {e:?}"))?;
     fs::write(&filepath, content).await.map(|e| anyhow!("failed to write file, {e:?}"))?;
 
-    Ok(())
+    Ok(format!("{}", filepath.display()))
 }
 
 #[cfg(test)]

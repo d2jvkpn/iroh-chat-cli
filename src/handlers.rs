@@ -150,7 +150,7 @@ pub async fn input_loop(
                 };
 
                 match receive_file(blobs_client, ticket, filename.to_string()).await {
-                    Ok(_) => info!("<-- ReceivedFile: {filename}\n{EOF_EVENT}"),
+                    Ok(v) => info!("<-- ReceivedFile: {filename}\n{v}\n{EOF_EVENT}"),
                     Err(e) => error!("ReceivedFile: {filename}, {e:?}\n{EOF_EVENT}"),
                 }
             }
@@ -253,9 +253,12 @@ pub async fn subscribe_loop(
             Msg::File { from, filename, content } => {
                 let entry = get_entry(&from).await;
                 // tokio::spawn(save_file(entry, filename, content));
+                let size = content.len();
                 tokio::spawn(async move {
                     match content_to_file(content, &filename).await {
-                        Ok(_) => info!("<-- SavedFile: {entry}, {filename}\n{EOF_EVENT}"),
+                        Ok(v) => {
+                            info!("<-- SavedFile: {entry}, {filename}\n{size}, {v}\n{EOF_EVENT}")
+                        }
                         Err(e) => error!("SaveFile: {entry}, {filename}, {e:?}\n{EOF_EVENT}"),
                     }
                 });

@@ -35,7 +35,7 @@ pub async fn receive_file(
     blobs_client: &MemClient,
     ticket: BlobTicket,
     filename: String,
-) -> Result<()> {
+) -> Result<String> {
     let filepath: path::PathBuf = filename.parse()?;
     let filepath = path::absolute(filepath)?;
 
@@ -47,11 +47,11 @@ pub async fn receive_file(
     blobs_client.download(ticket.hash(), ticket.node_addr().clone()).await?.finish().await?;
     // println!("--> Finished download, copying to destination: {filename}");
 
-    blobs_client
+    let export_outcome = blobs_client
         .export(ticket.hash(), filepath.clone(), ExportFormat::Blob, ExportMode::Copy)
         .await?
         .finish()
         .await?;
 
-    Ok(())
+    Ok(format!("{:?}", export_outcome))
 }

@@ -27,11 +27,11 @@ path = "src/bin/share.rs"
 
 [dependencies]
 anyhow = "1"
-base64 = "0.22"
+# base64 = "0.22"
 chrono = { version = "0.4", features = ["serde"] }
 clap = { version = "4", features = ["derive"] }
 crossterm = "0.29"
-# data-encoding = "2.9"
+data-encoding = "2"
 futures-lite = "2"
 iroh = "0.35"
 iroh-blobs = "0.35"

@@ -219,7 +219,7 @@ pub async fn write_topic_ticket(ticket: &TopicTicket, filename: &str) -> Result<
 
     let mut file = fs::File::create(&filepath).await?;
     // file.write_all(&ticket.to_bytes()).await?;
-    file.write_all(&ticket.base64_bytes()).await?;
+    file.write_all(&ticket.base32_bytes()).await?;
     file.write_all(b"\n").await?;
     // println!("--> node: {node_addr:?}\n    ticket: {ticket}");
     println!("--> node_id: {}", node_addr.node_id);
