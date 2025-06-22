@@ -9,8 +9,7 @@ version: 0.1.0
 
 #### ch01. 文档与运行
 1. docs
-- p2p chat, in rust, from scratch
-  https://www.youtube.com/watch?v=ogN_mBkWu7o
+- p2p chat, in rust, from scratch: https://www.youtube.com/watch?v=ogN_mBkWu7o
 - https://www.iroh.computer/docs/examples/gossip-chat
 - https://github.com/n0-computer/iroh-blobs/blob/main/examples/transfer.rs
 
