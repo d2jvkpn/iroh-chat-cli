@@ -4,11 +4,11 @@ use iroh_chat_cli::structs::{Msg, TopicTicket};
 use iroh_chat_cli::utils::{self, now};
 use iroh_chat_cli::{input_loop, subscribe_loop};
 
-use anyhow::{Result, anyhow};
+use anyhow::Result;
 use clap::{ArgAction, Args, Parser};
 use iroh::{
     Endpoint, NodeAddr, RelayMap, RelayMode, RelayNode, RelayUrl, SecretKey, protocol::Router,
-};
+}; // RelayUrlParseError
 use iroh_gossip::{net::Gossip, proto::TopicId};
 use rand::prelude::*;
 use tokio::{fs, io::AsyncWriteExt, sync::RwLock};
@@ -47,8 +47,8 @@ struct Command {
     #[clap(short, long)]
     name: String,
 
-    #[clap(long)]
-    relay_url: Option<String>,
+    #[arg(short = 'r', long, action=ArgAction::Append)]
+    relay_url: Vec<String>,
 
     #[arg(short = 'w', long)]
     write_ticket: Option<String>,
@@ -127,22 +127,34 @@ async fn main() -> Result<()> {
         None => utils::iroh_secret_key(),
     };
 
+    /*
     let relay_map: RelayMap = args
         .relay_url
         .and_then(|v| Some(v.parse::<RelayUrl>().ok()?))
         .map(RelayNode::from)
         .map(RelayMap::from)
         .unwrap_or_else(|| RelayMap::empty());
+    */
 
-    let endpoint = if relay_map.is_empty() {
-        Endpoint::builder() // use default relay url: https://euw1-1.relay.iroh.network
-    } else {
-        Endpoint::builder().relay_mode(RelayMode::Custom(relay_map))
+    let mut urls = Vec::with_capacity(args.relay_url.len());
+
+    for v in args.relay_url {
+        let v = v.parse::<RelayUrl>()?; // RelayUrl
+        urls.push(RelayNode::from(v));
     }
-    .secret_key(secret_key)
-    .discovery_n0()
-    .bind()
-    .await?;
+
+    let relay_map = if urls.is_empty() {
+        iroh::defaults::prod::default_relay_map()
+    } else {
+        RelayMap::from_iter(urls)
+    };
+
+    let endpoint = Endpoint::builder()
+        .relay_mode(RelayMode::Custom(relay_map))
+        .secret_key(secret_key)
+        .discovery_n0()
+        .bind()
+        .await?;
 
     //let relay_url = endpoint.home_relay().initialized().await.unwrap();
     //println!("==> relay_url: {:?}", relay_url);
@@ -165,12 +177,19 @@ async fn main() -> Result<()> {
     let mut all_nodes: Vec<NodeAddr> =
         ticket_nodes.choose_multiple(&mut rand::rng(), 5).map(|x| (*x).clone()).collect();
 
-    all_nodes.push(node_addr);
+    all_nodes.push(node_addr.clone());
 
     let ticket = TopicTicket { topic, nodes: all_nodes };
+    // dbg!(&ticket);
+
+    // println!("--> node: {node_addr:?}\n    ticket: {ticket}");
+    println!("--> node_id: {}", node_id);
+    println!("    relay_url: {:?}", node_addr.relay_url());
+    println!("    direct_addresses: {:?}", node_addr.direct_addresses().collect::<Vec<_>>());
     if let Some(v) = args.write_ticket {
         write_topic_ticket(&ticket, &v).await?;
     }
+    println!("    ticket: {ticket}");
 
     // join the gossip topic by connecting to known nodes, if any
     let node_ids = ticket_nodes.iter().map(|p| p.node_id).collect();
@@ -221,8 +240,6 @@ async fn main() -> Result<()> {
 }
 
 pub async fn write_topic_ticket(ticket: &TopicTicket, filename: &str) -> Result<()> {
-    let node_addr = ticket.nodes.last().ok_or_else(|| anyhow!("nodes is empty"))?;
-
     // fs::create_dir_all(dir).await?;
     // let filepath = dir.join(format!("{}.topic.ticket", filename));
 
@@ -235,12 +252,7 @@ pub async fn write_topic_ticket(ticket: &TopicTicket, filename: &str) -> Result<
     // file.write_all(&ticket.to_bytes()).await?;
     file.write_all(&ticket.base32_bytes()).await?;
     file.write_all(b"\n").await?;
-    // println!("--> node: {node_addr:?}\n    ticket: {ticket}");
-    println!("--> node_id: {}", node_addr.node_id);
-    println!("    filepath: {}", filepath.display());
-    println!("    relay_url: {:?}", node_addr.relay_url());
-    println!("    direct_addresses: {:?}", node_addr.direct_addresses().collect::<Vec<_>>());
-    println!("    ticket: {ticket}");
+    println!("    saved_ticket: {}", filepath.display());
 
     Ok(())
 }

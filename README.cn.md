@@ -12,6 +12,7 @@ version: 0.1.0
 - p2p chat, in rust, from scratch: https://www.youtube.com/watch?v=ogN_mBkWu7o
 - https://www.iroh.computer/docs/examples/gossip-chat
 - https://github.com/n0-computer/iroh-blobs/blob/main/examples/transfer.rs
+- https://github.com/n0-computer/iroh/releases
 
 2. chat
 ```
@@ -42,30 +43,30 @@ How are you today?\n
 
 3. 查看当前用户信息
 ```
-:me\n
+::me\n
 ```
 
 4. 退出聊天
 ```
-:quit\n
+::quit\n
 ```
 
 5. 查看当前在线用户
 ```
-:online\n
+::online\n
 ```
 
 6. 直接发送一个小文件（最大支持 8MB）
 ```
-:send path/to/file\n
+::send path/to/file\n
 ```
 
 7. 分享一个任意大小的文件
 ```
-:share path/to/file\n
+::share path/to/file\n
 ```
 
 8. 接收一个被分享的文件
 ```
-:receive blobs_ticket path/to/save\n
+::receive blobs_ticket path/to/save\n
 ```

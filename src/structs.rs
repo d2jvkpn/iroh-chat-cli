@@ -7,13 +7,13 @@ use iroh_blobs::ticket::BlobTicket;
 use iroh_gossip::proto::TopicId;
 use serde::{Deserialize, Serialize};
 
-pub const COMMAND_QUIT: &str = ":quit";
-pub const COMMAND_ME: &str = ":me";
-pub const COMMAND_ONLINE: &str = ":online";
+pub const COMMAND_QUIT: &str = "::quit";
+pub const COMMAND_ME: &str = "::me";
+pub const COMMAND_ONLINE: &str = "::online";
 
-pub const COMMAND_SEND: &str = ":send";
-pub const COMMAND_SHARE: &str = ":share";
-pub const COMMAND_RECEIVE: &str = ":receive";
+pub const COMMAND_SEND: &str = "::send";
+pub const COMMAND_SHARE: &str = "::share";
+pub const COMMAND_RECEIVE: &str = "::receive";
 
 pub const MAX_FILESIZE: u64 = 8 * 1024 * 1024;
 
