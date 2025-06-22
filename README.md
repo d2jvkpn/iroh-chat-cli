@@ -34,7 +34,7 @@ cargo run --bin iroh-share-file -- receive <ticket> <filepath>  # make receive_f
 Hello\n
 ```
 
-2. send a multiline message (keep a space at the end of line)
+2. send a multiline message(keep a space at the end of line)
 ```
 Hello \n
 I'm Alice. \n

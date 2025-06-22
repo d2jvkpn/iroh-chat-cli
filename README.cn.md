@@ -27,10 +27,12 @@ cargo run --bin iroh-share-file -- share <filepath>             # make share_fil
 cargo run --bin iroh-share-file -- receive <ticket> <filepath>  # make receive_file, receive a file
 ``
 
+
 #### ch02. 聊天
 1. 发送单行消息
 ```text
 Hello\r
+```
 
 2. 发送多行消息（每行末尾保留一个空格）
 ```
