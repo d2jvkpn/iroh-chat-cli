@@ -88,10 +88,18 @@ pub async fn input_loop(
                 info!("{EOF_EVENT}");
             }
             COMMAND_SEND => {
-                let (filepath, _) = split_first_space(&line[COMMAND_SEND.len()..], true);
-                if filepath.is_empty() {
-                    warn!("no input file\n{EOF_EVENT}");
-                    continue;
+                // let (filepath, _) = split_first_space(&line[COMMAND_SEND.len()..], true);
+                //if filepath.is_empty() {
+                //    warn!("no input file\n{EOF_EVENT}");
+                //    continue;
+                //};
+
+                let filepath = match shell_words::split(&line) {
+                    Ok(args) if args.len() == 2 => args[1].clone(),
+                    _ => {
+                        warn!("expected {COMMAND_SEND} <filepath>\n{EOF_EVENT}");
+                        continue;
+                    }
                 };
 
                 let filename = filepath.to_string();
@@ -109,14 +117,22 @@ pub async fn input_loop(
                 }
             }
             COMMAND_SHARE => {
-                let (filename, _) = split_first_space(&line[COMMAND_SHARE.len()..], true);
-                if filename.is_empty() {
-                    warn!("no input file\n{EOF_EVENT}");
-                    continue;
+                //let (filename, _) = split_first_space(&line[COMMAND_SHARE.len()..], true);
+                //if filename.is_empty() {
+                //    warn!("no input file\n{EOF_EVENT}");
+                //    continue;
+                //};
+
+                let filename = match shell_words::split(&line) {
+                    Ok(args) if args.len() == 2 => args[1].clone(),
+                    _ => {
+                        warn!("expected {COMMAND_SHARE} <filepath>\n{EOF_EVENT}");
+                        continue;
+                    }
                 };
 
                 // TODO: async, stop sharing
-                let (size, ticket) = match share_file(blobs_client, node_id, filename).await {
+                let (size, ticket) = match share_file(blobs_client, node_id, &filename).await {
                     Ok(v) => v,
                     Err(e) => {
                         error!("ShareFile:\n{filename}, {e:?}\n{EOF_EVENT}");
@@ -133,12 +149,20 @@ pub async fn input_loop(
                 }
             }
             COMMAND_RECEIVE => {
-                let (ticket, filename) = split_first_space(&line[COMMAND_RECEIVE.len()..], true);
+                //let (ticket, filename) = split_first_space(&line[COMMAND_RECEIVE.len()..], true);
 
-                let filename = match filename {
-                    Some(v) => v,
-                    None => {
-                        warn!("no filename\n{EOF_EVENT}");
+                //let filename = match filename {
+                //    Some(v) => v,
+                //    None => {
+                //        warn!("no filename\n{EOF_EVENT}");
+                //        continue;
+                //    }
+                //};
+
+                let (ticket, filename) = match shell_words::split(&line) {
+                    Ok(args) if args.len() == 3 => (args[1].clone(), args[2].clone()),
+                    _ => {
+                        warn!("expect {COMMAND_RECEIVE} <ticket> <filepath>\n{EOF_EVENT}");
                         continue;
                     }
                 };
