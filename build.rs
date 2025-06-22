@@ -1,6 +1,6 @@
 use std::process::Command;
 
-use chrono::{SecondsFormat, Utc};
+use chrono::{DateTime, SecondsFormat, Utc};
 
 fn main() {
     // let build_time = chrono::Utc::now().to_rfc3339();
@@ -10,22 +10,26 @@ fn main() {
         .args(&["rev-parse", "--abbrev-ref", "HEAD"])
         .output()
         .ok()
-        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+        .map(|v| String::from_utf8_lossy(&v.stdout).trim().to_string())
         .unwrap_or_else(|| "unknown".to_string());
 
     let git_commit_hash = Command::new("git")
         .args(&["rev-parse", "HEAD"])
         .output()
         .ok()
-        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+        .map(|v| String::from_utf8_lossy(&v.stdout).trim().to_string())
         .unwrap_or_else(|| "unknown".to_string());
 
     let git_commit_time = Command::new("git")
         .args(&["show", "-s", "--format=%cI", "HEAD"])
         .output()
         .ok()
-        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+        .map(|v| String::from_utf8_lossy(&v.stdout).trim().to_string())
         .unwrap_or_else(|| "unknown".to_string());
+
+    let git_commit_time = DateTime::parse_from_rfc3339(&git_commit_time)
+        .map(|v| v.with_timezone(&Utc).to_rfc3339())
+        .unwrap_or_else(|_| "unknown".to_string());
 
     println!("cargo:rustc-env=BUILD_TIME={}", build_time);
     println!("cargo:rustc-env=GIT_BRANCH={}", git_branch);

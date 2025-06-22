@@ -17,9 +17,9 @@ use tracing_subscriber::EnvFilter;
 
 const BUILD_INFO: &str = concat!(
     "\nBuildInfo: \n",
-    "\n  build_time: ",
+    "  build_time: ",
     env!("BUILD_TIME"),
-    "  git_branch: ",
+    "\n  git_branch: ",
     env!("GIT_BRANCH"),
     "\n  git_commit_hash: ",
     env!("GIT_COMMIT_HASH"),
