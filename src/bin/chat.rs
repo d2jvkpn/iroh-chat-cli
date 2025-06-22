@@ -37,7 +37,7 @@ struct Command {
     #[clap(long)]
     relay_url: Option<String>,
 
-    #[arg(short, long)]
+    #[arg(short = 'w', long)]
     write_ticket: Option<String>,
 
     #[clap(short, long)] // default_value = "configs/local.yaml"
@@ -69,7 +69,7 @@ struct JoinCommand {
     ticket: String,
 
     // --ticket t1 --ticket t2 --ticket t3
-    #[arg(short = 't', long = "ticket", action = ArgAction::Append)]
+    #[arg(short='t', long ="ticket", action=ArgAction::Append)]
     tickets_v1: Vec<String>,
 
     /// t1 t2 t3
@@ -149,7 +149,7 @@ async fn main() -> Result<()> {
     // in our main file, after we create a topic `id`:
     // print a ticket that includes our own node id and endpoint addresses
     let mut all_nodes: Vec<NodeAddr> =
-        ticket_nodes.choose_multiple(&mut rand::rng(), 2).map(|x| (*x).clone()).collect();
+        ticket_nodes.choose_multiple(&mut rand::rng(), 5).map(|x| (*x).clone()).collect();
 
     all_nodes.push(node_addr);
 

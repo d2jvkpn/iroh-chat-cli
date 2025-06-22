@@ -10,16 +10,16 @@ test01:
 	cargo run --bin test01
 
 Alice:
-	cargo run --bin iroh-chat-cli --  --name Alice --write-ticket configs/Alice.topic.ticket open
+	cargo run --bin iroh-chat-cli --  --name Alice -w configs/Alice.topic.ticket open
 
 # $$(awk 'NR==1{printf $$1}' configs/Alice.topic.ticket | base64 -w0)
 
 Bob:
-	cargo run --bin iroh-chat-cli -- --name Bob --write-ticket configs/Bob.topic.ticket \
+	cargo run --bin iroh-chat-cli -- --name Bob -w configs/Bob.topic.ticket \
 	  join $$(cat configs/Alice.topic.ticket)
 
 John:
-	cargo run --bin iroh-chat-cli -- --name John --write-ticket configs/Bob.John.ticket \
+	cargo run --bin iroh-chat-cli -- --name John -w configs/Bob.John.ticket \
 	  join $$(cat configs/Bob.topic.ticket)
 
 share_file:
