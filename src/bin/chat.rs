@@ -1,8 +1,8 @@
 use std::{collections::HashMap, fmt::Debug, path, str::FromStr};
 
-use iroh_chat_cli::handlers::{input_loop, subscribe_loop};
 use iroh_chat_cli::structs::{Msg, TopicTicket};
 use iroh_chat_cli::utils::{self, now};
+use iroh_chat_cli::{input_loop, subscribe_loop};
 
 use anyhow::{Result, anyhow};
 use clap::{ArgAction, Args, Parser};
@@ -85,7 +85,8 @@ async fn main() -> Result<()> {
     let filter = if args.verbose {
         EnvFilter::new("debug")
     } else {
-        EnvFilter::new(format!("{0}=info,{0}::handlers=info", module_path!()))
+        // EnvFilter::new(format!("{0}=info,{0}::handlers=info", module_path!()))
+        EnvFilter::new(format!("{0}=info", module_path!()))
     };
     utils::log2stdout(filter);
 
