@@ -1,4 +1,4 @@
-use std::{collections::HashMap, process::Command};
+use std::{collections::HashMap, path, process::Command};
 
 use crate::structs::{
     COMMAND_COMMAND, COMMAND_ME, COMMAND_MEMBERS, COMMAND_QUIT, COMMAND_RECEIVE_FILE,
@@ -136,9 +136,16 @@ pub async fn input_loop(
                     }
                 };
 
-                let filename = filepath.to_string();
-                let msg = match read_file_to_send(&filename).await {
-                    Ok(content) => Msg::SendFile { filename, content },
+                let basename = match path::Path::new(&filepath).file_name() {
+                    Some(v) => v.to_string_lossy().to_string(),
+                    _ => {
+                        warn!("{command} invalid filepath: {filepath}\n{EOF_BLOCK}");
+                        continue;
+                    }
+                };
+
+                let msg = match read_file_to_send(&filepath).await {
+                    Ok(content) => Msg::SendFile { filename: basename, content },
                     Err(e) => {
                         error!("{command} error: {filepath}, {e:?}\n{EOF_BLOCK}");
                         continue;
@@ -157,7 +164,7 @@ pub async fn input_loop(
                 //    continue;
                 //};
 
-                let filename = match shell_words::split(&line) {
+                let filepath = match shell_words::split(&line) {
                     Ok(args) if args.len() == 2 => args[1].clone(),
                     _ => {
                         warn!("{command} expected: <filepath>\n{EOF_BLOCK}");
@@ -165,21 +172,29 @@ pub async fn input_loop(
                     }
                 };
 
+                let basename = match path::Path::new(&filepath).file_name() {
+                    Some(v) => v.to_string_lossy().to_string(),
+                    _ => {
+                        warn!("{command} invalid filepath: {filepath}\n{EOF_BLOCK}");
+                        continue;
+                    }
+                };
+
                 // TODO: async, stop sharing
-                let (size, ticket) = match share_file(blobs_client, blobs_node_id, &filename).await
+                let (size, ticket) = match share_file(blobs_client, blobs_node_id, &filepath).await
                 {
                     Ok(v) => v,
                     Err(e) => {
-                        error!("{command} error: {filename}, {e:?}\n{EOF_BLOCK}");
+                        error!("{command} error: {filepath}, {e:?}\n{EOF_BLOCK}");
                         continue;
                     }
                 };
 
                 let msg =
-                    Msg::ShareFile { filename: filename.to_string(), size, ticket: ticket.clone() };
+                    Msg::ShareFile { filename: basename.clone(), size, ticket: ticket.clone() };
 
                 match sender.broadcast(msg.to_vec().into()).await {
-                    Ok(_) => info!("{command} broadcast ok:\n{ticket} {filename}"),
+                    Ok(_) => info!("{command} broadcast ok:\n{ticket} {basename}"),
                     Err(e) => error!("{command} broadcast error: {e:?}"),
                 }
             }
@@ -194,7 +209,7 @@ pub async fn input_loop(
                 //    }
                 //};
 
-                let (ticket, filename) = match shell_words::split(&line) {
+                let (ticket, filepath) = match shell_words::split(&line) {
                     Ok(args) if args.len() == 3 => (args[1].clone(), args[2].clone()),
                     _ => {
                         warn!("{command} expect: <ticket> <filepath>\n{EOF_BLOCK}");
@@ -210,9 +225,9 @@ pub async fn input_loop(
                     }
                 };
 
-                match receive_file(blobs_client, ticket, filename.to_string()).await {
-                    Ok(v) => info!("{command} ok: {filename}, {v}"),
-                    Err(e) => error!("{command} error: {filename}, {e:?}"),
+                match receive_file(blobs_client, ticket, filepath.to_string()).await {
+                    Ok(v) => info!("{command} ok: {filepath}, {v}"),
+                    Err(e) => error!("{command} error: {filepath}, {e:?}"),
                 }
             }
             v if v.starts_with(":") => error!("Unknown command: {v:?}"),
