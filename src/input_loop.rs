@@ -8,7 +8,7 @@ use crate::transfer::{receive_file, share_file};
 use crate::utils::{now, read_file_to_send, split_first_space};
 
 use anyhow::Result;
-use iroh::{Endpoint, NodeId, protocol::Router};
+use iroh::{Endpoint, NodeId, RelayMap, RelayMode, protocol::Router};
 use iroh_blobs::{net_protocol::Blobs, ticket::BlobTicket};
 use iroh_gossip::net::GossipSender;
 use tokio::io::{self, AsyncBufReadExt};
@@ -17,20 +17,22 @@ use tracing::{error, info, warn}; // Level, instrument
 
 /// Read input from stdin
 pub async fn input_loop(
-    endpoint: Endpoint,
-    name: String,
+    node: (NodeId, String),
     sender: GossipSender,
     members: std::sync::Arc<RwLock<HashMap<NodeId, String>>>,
+    relay_map: RelayMap,
 ) -> Result<()> {
-    let node_id: NodeId = endpoint.node_id();
+    let (node_id, name) = node;
     let eol = &['\r', '\n'][..];
-
     // println!("module_path = {}", module_path!());
 
+    let blobs_endpoint =
+        Endpoint::builder().relay_mode(RelayMode::Custom(relay_map)).discovery_n0().bind().await?;
+    let blobs_node_id = blobs_endpoint.node_id(); // router.endpoint().node_id();
     // We initialize the Blobs protocol in-memory
-    let blobs = Blobs::memory().build(&endpoint);
+    let blobs = Blobs::memory().build(&blobs_endpoint);
     // Now we build a router that accepts blobs connections & routes them to the blobs protocol.
-    let _router = Router::builder(endpoint).accept(iroh_blobs::ALPN, blobs.clone()).spawn();
+    let router = Router::builder(blobs_endpoint).accept(iroh_blobs::ALPN, blobs.clone()).spawn();
     // We use a blobs client to interact with the blobs protocol we're running locally:
     let blobs_client = blobs.client();
 
@@ -164,7 +166,8 @@ pub async fn input_loop(
                 };
 
                 // TODO: async, stop sharing
-                let (size, ticket) = match share_file(blobs_client, node_id, &filename).await {
+                let (size, ticket) = match share_file(blobs_client, blobs_node_id, &filename).await
+                {
                     Ok(v) => v,
                     Err(e) => {
                         error!("{COMMAND_SHARE_FILE}: {filename}, {e:?}\n{EOF_EVENT}");
@@ -173,10 +176,13 @@ pub async fn input_loop(
                 };
                 info!("{COMMAND_SHARE_FILE} blobs: size={size}\n{ticket} {filename}\n{EOF_EVENT}");
 
-                let msg = Msg::ShareFile { filename: filename.to_string(), size, ticket };
+                let msg =
+                    Msg::ShareFile { filename: filename.to_string(), size, ticket: ticket.clone() };
 
                 match sender.broadcast(msg.to_vec().into()).await {
-                    Ok(_) => info!("{COMMAND_SHARE_FILE} broadcast ok\n{EOF_MESSAGE}"),
+                    Ok(_) => info!(
+                        "{COMMAND_SHARE_FILE} broadcast ok:\n{ticket} {filename}\n{EOF_MESSAGE}"
+                    ),
                     Err(e) => error!("{COMMAND_SHARE_FILE} broadcast error: {e:?}\n{EOF_EVENT}"),
                 }
             }
@@ -214,6 +220,7 @@ pub async fn input_loop(
                     }
                 }
             }
+            v if v.starts_with(":") => error!("Unknown command: {v:?}\n{EOF_EVENT}"),
             _ => {
                 let msg = Msg::Message { text: text };
 
@@ -224,6 +231,8 @@ pub async fn input_loop(
             }
         }
     }
+
+    router.shutdown().await?;
 
     Ok(())
 }

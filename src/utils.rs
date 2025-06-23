@@ -29,11 +29,6 @@ pub fn now() -> String {
     return now.to_rfc3339_opts(SecondsFormat::Millis, true);
 }
 
-pub fn timestamp_prefix() -> String {
-    let now = Local::now();
-    return now.format("%Y-%m-%d-%s").to_string();
-}
-
 pub fn iroh_secret_key() -> SecretKey {
     // let secret_key = SecretKey::generate(rand::rngs::ThreadRng); // !!! rand 0.8
     // let endpoint =
@@ -67,7 +62,8 @@ struct LogTime;
 impl FormatTime for LogTime {
     fn format_time(&self, w: &mut format::Writer<'_>) -> std::fmt::Result {
         let now = Local::now();
-        write!(w, "{}", now.format("%Y-%m-%dT%H:%M:%S%:z"))
+        // write!(w, "{}", now.format("%Y-%m-%dT%H:%M:%S%:z"))
+        write!(w, "{}", now.to_rfc3339_opts(SecondsFormat::Millis, true))
     }
 }
 
@@ -130,19 +126,21 @@ pub async fn read_file_to_send(filename: &str) -> Result<Vec<u8>> {
 }
 
 pub async fn content_to_file(content: Vec<u8>, filename: &str) -> Result<String> {
-    let dir = path::Path::new("data").join("downloads");
+    if content.len() > MAX_FILESIZE.try_into().unwrap() {
+        return Err(anyhow!("file size is too large than {MAX_FILESIZE}"));
+    }
 
     // info!("<-- ReceivingFile: {source}, {filename}\n{EOF_EVENT}");
-    let filepath = match path::Path::new(filename).file_name() {
+    let filename = match path::Path::new(filename).file_name() {
         Some(v) => v.to_string_lossy().to_string(),
         None => return Err(anyhow!("invalid filepath")),
     };
 
-    let filepath = dir.join(format!("{}_{}", timestamp_prefix(), filepath));
+    // let prefix = Local::now().format("%Y-%m-%d-%s").to_string();
+    let dir =
+        path::Path::new("data").join("downloads").join(Local::now().format("%Y-%m-%d").to_string());
 
-    if content.len() > MAX_FILESIZE.try_into().unwrap() {
-        return Err(anyhow!("file size is too large than {MAX_FILESIZE}"));
-    }
+    let filepath = dir.join(filename);
 
     fs::create_dir_all(dir.clone()).await.map_err(|e| anyhow!("failed to create dir, {e:?}"))?;
     fs::write(&filepath, content).await.map(|e| anyhow!("failed to write file, {e:?}"))?;

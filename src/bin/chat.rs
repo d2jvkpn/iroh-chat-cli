@@ -6,9 +6,8 @@ use iroh_chat_cli::{input_loop, subscribe_loop};
 
 use anyhow::Result;
 use clap::{ArgAction, Args, Parser};
-use iroh::{
-    Endpoint, NodeAddr, RelayMap, RelayMode, RelayNode, RelayUrl, SecretKey, protocol::Router,
-}; // RelayUrlParseError
+use iroh::{Endpoint, NodeAddr, RelayMap, RelayMode, RelayUrl, SecretKey, protocol::Router};
+/* RelayUrlParseError, RelayNode */
 use iroh_gossip::{net::Gossip, proto::TopicId};
 use rand::prelude::*;
 use tokio::{fs, io::AsyncWriteExt, sync::RwLock};
@@ -136,21 +135,23 @@ async fn main() -> Result<()> {
         .unwrap_or_else(|| RelayMap::empty());
     */
 
-    let mut urls = Vec::with_capacity(args.relay_url.len());
-
-    for v in args.relay_url {
-        let v = v.parse::<RelayUrl>()?; // RelayUrl
-        urls.push(RelayNode::from(v));
-    }
-
-    let relay_map = if urls.is_empty() {
+    let relay_map = if args.relay_url.is_empty() {
         iroh::defaults::prod::default_relay_map()
+    } else if args.relay_url.len() == 1 && args.relay_url[0] == "" {
+        RelayMap::empty()
     } else {
+        let mut urls = Vec::with_capacity(args.relay_url.len());
+
+        for v in args.relay_url {
+            let v = v.parse::<RelayUrl>()?;
+            urls.push(v);
+        }
+
         RelayMap::from_iter(urls)
     };
 
     let endpoint = Endpoint::builder()
-        .relay_mode(RelayMode::Custom(relay_map))
+        .relay_mode(RelayMode::Custom(relay_map.clone()))
         .secret_key(secret_key)
         .discovery_n0()
         .bind()
@@ -217,17 +218,11 @@ async fn main() -> Result<()> {
     sender.broadcast(msg.to_vec().into()).await?;
 
     let members = std::sync::Arc::new(RwLock::new(HashMap::new()));
-    tokio::spawn(subscribe_loop(
-        endpoint.clone(),
-        name.clone(),
-        sender.clone(),
-        receiver,
-        members.clone(),
-    ));
+    tokio::spawn(subscribe_loop(name.clone(), sender.clone(), receiver, members.clone()));
     // broadcast each line we type
     info!("==> Type a message and hit enter to broadcast...");
 
-    if let Err(e) = input_loop(endpoint.clone(), name.clone(), sender.clone(), members).await {
+    if let Err(e) = input_loop((node_id, name.clone()), sender.clone(), members, relay_map).await {
         error!("input_loop: {e:?}");
     }
 

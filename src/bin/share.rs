@@ -15,7 +15,7 @@ async fn main() -> Result<()> {
     // Convert to &str, so we can pattern-match easily:
     let arg_refs: Vec<&str> = args.iter().map(String::as_str).collect();
 
-    let filter = EnvFilter::new(format!("{0}=info,{0}::handlers=info", module_path!()));
+    let filter = EnvFilter::new(format!("{0}=info", module_path!()));
     utils::log2stdout(filter);
 
     // Create an endpoint, it allows creating and accepting connections in the iroh p2p world

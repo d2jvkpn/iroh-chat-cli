@@ -5,19 +5,17 @@ use crate::utils::{content_to_file, now};
 
 use anyhow::Result;
 use futures_lite::StreamExt;
-use iroh::{Endpoint, NodeId, PublicKey};
+use iroh::{NodeId, PublicKey};
 use iroh_gossip::net::{self, Event, GossipEvent, GossipReceiver, GossipSender};
 use tokio::sync::RwLock;
 use tracing::{error, info, warn}; // Level, instrument
 
 pub async fn subscribe_loop(
-    _endpoint: Endpoint,
     name: String,
     sender: GossipSender,
     mut receiver: GossipReceiver,
     members: std::sync::Arc<RwLock<HashMap<NodeId, String>>>,
 ) -> Result<()> {
-    // let node_id: NodeId = endpoint.node_id();
     let about_me = Message::new(Msg::AboutMe { name: name.to_string(), at: now() });
 
     let get_entry = async |from: &PublicKey| {
@@ -98,6 +96,7 @@ pub async fn subscribe_loop(
                 let entry = get_entry(&from).await;
                 // tokio::spawn(save_file(entry, filename, content));
                 let size = content.len();
+
                 tokio::spawn(async move {
                     match content_to_file(content, &filename).await {
                         Ok(v) => {
