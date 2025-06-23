@@ -174,7 +174,6 @@ pub async fn input_loop(
                         continue;
                     }
                 };
-                info!("{command} blobs: size={size}\n{ticket} {filename}");
 
                 let msg =
                     Msg::ShareFile { filename: filename.to_string(), size, ticket: ticket.clone() };
