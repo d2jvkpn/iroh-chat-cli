@@ -210,7 +210,7 @@ async fn main() -> Result<()> {
         }
     }
 
-    dbg!(&node_ids);
+    // dbg!(&node_ids);
     let (sender, receiver) = gossip.subscribe_and_join(topic, node_ids).await?.split();
     info!("connected!");
 

@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::structs::{EOF_EVENT, EOF_MESSAGE, Message, Msg};
+use crate::structs::{EOF_BLOCK, Message, Msg};
 use crate::utils::{content_to_file, now};
 
 use anyhow::Result;
@@ -40,20 +40,20 @@ pub async fn subscribe_loop(
     while let Some(event) = receiver.try_next().await? {
         let msg: net::Message = match event {
             Event::Lagged => {
-                warn!("<-- Lagged\n{EOF_EVENT}");
+                warn!("=== Lagged");
                 continue;
             }
             Event::Gossip(GossipEvent::Joined(node_ids)) => {
-                info!("<-- Joined: {:?}\n{EOF_EVENT}", node_ids);
+                info!("=== Joined: {:?}", node_ids);
                 continue;
             }
             Event::Gossip(GossipEvent::NeighborUp(from)) => {
-                info!("<-- NeighborUp: {from}\n{EOF_EVENT}");
+                info!("=== NeighborUp: {from}");
                 continue;
             }
             Event::Gossip(GossipEvent::NeighborDown(from)) => {
                 let entry = remove_entry(&from).await;
-                info!("<-- NeighborDown: {entry}\n{EOF_EVENT}");
+                info!("=== NeighborDown: {entry}");
                 continue;
             }
             Event::Gossip(GossipEvent::Received(v)) => v,
@@ -64,7 +64,7 @@ pub async fn subscribe_loop(
         let msg: Msg = match Message::from_bytes(&msg.content) {
             Ok(v) => v.msg,
             Err(e) => {
-                error!("unknown message content from {from}: {e:?}, {:?}", &msg.content);
+                error!("Unknown message: {}, {e:?}\n{EOF_BLOCK}", get_entry(&from).await);
                 continue;
             }
         };
@@ -73,7 +73,7 @@ pub async fn subscribe_loop(
         match msg {
             Msg::Bye { at } => {
                 let entry = remove_entry(&from).await;
-                warn!("<-- Bye: {entry}\n{at}\n{EOF_EVENT}");
+                warn!("<-- Bye: {entry}\n{at}");
             }
             Msg::AboutMe { name: peer_name, at } => {
                 let mut members = members.write().await;
@@ -81,16 +81,16 @@ pub async fn subscribe_loop(
                 if !members.contains_key(&from) {
                     members.insert(from, peer_name.clone());
                     // println!("<-- Peer: {} is now known as {:?}", from, name);
-                    info!("<-- NewPeer: {from}\n{peer_name:?}, {at}\n{EOF_EVENT}");
+                    info!("<-- NewPeer: {from}\nname={peer_name:?}, at={at}");
                 }
 
                 if let Err(e) = sender.broadcast(about_me.to_bytes().into()).await {
-                    error!("BroadcastAbountMe: {e:?}\n{EOF_EVENT}");
+                    error!("Broadcast AbountMe: {e:?}");
                 }
             }
             Msg::Message { text } => {
                 let entry = get_entry(&from).await;
-                info!("<<< Message: {entry}\n{}\n{EOF_MESSAGE}", text.trim_end());
+                info!("<<< Message: {entry}\n{}", text.trim_end());
             }
             Msg::SendFile { filename, content } => {
                 let entry = get_entry(&from).await;
@@ -100,17 +100,22 @@ pub async fn subscribe_loop(
                 tokio::spawn(async move {
                     match content_to_file(content, &filename).await {
                         Ok(v) => {
-                            info!("<-- SavedFile: {entry}, {filename}\n{size}, {v}\n{EOF_EVENT}")
+                            info!("<-- Received SendFile: {entry}, {filename}");
+                            println!("size={size}, path={v}");
                         }
-                        Err(e) => error!("SaveFile: {entry}, {filename}, {e:?}\n{EOF_EVENT}"),
+                        Err(e) => {
+                            error!("!!! Received SendFile: {entry}, {filename}, {e:?}");
+                        }
                     }
                 });
             }
             Msg::ShareFile { filename, size, ticket } => {
                 let entry = get_entry(&from).await;
-                info!("<-- Share: {entry}, size={size}\n{ticket} {filename}\n{EOF_MESSAGE}");
+                info!("<-- Got Share: {entry}, size={size}\n{ticket} {filename}");
             }
         }
+
+        println!("{}", EOF_BLOCK);
     }
 
     Ok(())
