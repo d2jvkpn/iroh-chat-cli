@@ -11,14 +11,14 @@ use tokio::sync::RwLock;
 use tracing::{error, info, warn}; // Level, instrument
 
 pub async fn subscribe_loop(
-    endpoint: Endpoint,
+    _endpoint: Endpoint,
     name: String,
     sender: GossipSender,
     mut receiver: GossipReceiver,
     members: std::sync::Arc<RwLock<HashMap<NodeId, String>>>,
 ) -> Result<()> {
-    let node_id: NodeId = endpoint.node_id();
-    let about_me = Message::new(Msg::AboutMe { from: node_id, name: name.to_string(), at: now() });
+    // let node_id: NodeId = endpoint.node_id();
+    let about_me = Message::new(Msg::AboutMe { name: name.to_string(), at: now() });
 
     let get_entry = async |from: &PublicKey| {
         // if it's a `Message` message, get the name from the map and print the message
@@ -61,21 +61,23 @@ pub async fn subscribe_loop(
             Event::Gossip(GossipEvent::Received(v)) => v,
         };
 
+        let from = msg.delivered_from;
+        // dbg!(&from);
         let msg: Msg = match Message::from_bytes(&msg.content) {
             Ok(v) => v.msg,
             Err(e) => {
-                error!("unknown message content: {e:?}, {:?}", &msg.content);
+                error!("unknown message content from {from}: {e:?}, {:?}", &msg.content);
                 continue;
             }
         };
 
         // deserialize the message and match on the message type:
         match msg {
-            Msg::Bye { from, at } => {
+            Msg::Bye { at } => {
                 let entry = remove_entry(&from).await;
                 warn!("<-- Bye: {entry}\n{at}\n{EOF_EVENT}");
             }
-            Msg::AboutMe { from, name: peer_name, at } => {
+            Msg::AboutMe { name: peer_name, at } => {
                 let mut members = members.write().await;
                 // if it's an `AboutMe` message add and entry into the map and print the name
                 if !members.contains_key(&from) {
@@ -88,11 +90,11 @@ pub async fn subscribe_loop(
                     error!("BroadcastAbountMe: {e:?}\n{EOF_EVENT}");
                 }
             }
-            Msg::Message { from, text } => {
+            Msg::Message { text } => {
                 let entry = get_entry(&from).await;
                 info!("<<< Message: {entry}\n{}\n{EOF_MESSAGE}", text.trim_end());
             }
-            Msg::File { from, filename, content } => {
+            Msg::SendFile { filename, content } => {
                 let entry = get_entry(&from).await;
                 // tokio::spawn(save_file(entry, filename, content));
                 let size = content.len();
@@ -105,7 +107,7 @@ pub async fn subscribe_loop(
                     }
                 });
             }
-            Msg::Share { from, filename, size, ticket } => {
+            Msg::ShareFile { filename, size, ticket } => {
                 let entry = get_entry(&from).await;
                 info!("<-- Share: {entry}, size={size}\n{ticket} {filename}\n{EOF_MESSAGE}");
             }

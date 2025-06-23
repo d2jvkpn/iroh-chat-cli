@@ -2,18 +2,19 @@ use std::{fmt, str::FromStr};
 
 use anyhow::Result;
 // use base64::{Engine, engine::general_purpose};
-use iroh::{NodeAddr, NodeId};
+use iroh::NodeAddr; // NodeId
 use iroh_blobs::ticket::BlobTicket;
 use iroh_gossip::proto::TopicId;
 use serde::{Deserialize, Serialize};
 
 pub const COMMAND_QUIT: &str = "::quit";
 pub const COMMAND_ME: &str = "::me";
-pub const COMMAND_ONLINE: &str = "::online";
+pub const COMMAND_MEMBERS: &str = "::members";
+pub const COMMAND_COMMAND: &str = "::command";
 
-pub const COMMAND_SEND: &str = "::send";
-pub const COMMAND_SHARE: &str = "::share";
-pub const COMMAND_RECEIVE: &str = "::receive";
+pub const COMMAND_SEND_FILE: &str = "::send_file";
+pub const COMMAND_SHARE_FILE: &str = "::share_file";
+pub const COMMAND_RECEIVE_FILE: &str = "::receive_file";
 
 pub const MAX_FILESIZE: u64 = 8 * 1024 * 1024;
 
@@ -22,11 +23,11 @@ pub const EOF_EVENT: &str = "+++++++++++++++++++++++++++++++++++++++++++++++++++
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum Msg {
-    AboutMe { from: NodeId, name: String, at: String },
-    Message { from: NodeId, text: String },
-    File { from: NodeId, filename: String, content: Vec<u8> },
-    Share { from: NodeId, filename: String, size: u64, ticket: BlobTicket },
-    Bye { from: NodeId, at: String },
+    AboutMe { name: String, at: String },
+    Bye { at: String },
+    Message { text: String },
+    SendFile { filename: String, content: Vec<u8> },
+    ShareFile { filename: String, size: u64, ticket: BlobTicket },
 }
 
 impl Msg {

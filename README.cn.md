@@ -53,20 +53,25 @@ How are you today?\n
 
 5. 查看当前在线用户
 ```
-::online\n
+::members\n
 ```
 
 6. 直接发送一个小文件（最大支持 8MB）
 ```
-::send path/to/file\n
+::send_file path/to/file\n
 ```
 
 7. 分享一个任意大小的文件
 ```
-::share path/to/file\n
+::share_file path/to/file\n
 ```
 
 8. 接收一个被分享的文件
 ```
-::receive blobs_ticket path/to/save\n
+::receive_file blobs_ticket path/to/save\n
+```
+
+9. 本地执行一个命令
+```
+::command ls -alh
 ```

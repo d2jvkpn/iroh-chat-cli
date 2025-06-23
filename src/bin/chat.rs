@@ -175,7 +175,7 @@ async fn main() -> Result<()> {
     // in our main file, after we create a topic `id`:
     // print a ticket that includes our own node id and endpoint addresses
     let mut all_nodes: Vec<NodeAddr> =
-        ticket_nodes.choose_multiple(&mut rand::rng(), 5).map(|x| (*x).clone()).collect();
+        ticket_nodes.choose_multiple(&mut rand::rng(), 3).map(|x| (*x).clone()).collect();
 
     all_nodes.push(node_addr.clone());
 
@@ -213,7 +213,7 @@ async fn main() -> Result<()> {
     let (sender, receiver) = gossip.subscribe_and_join(topic, node_ids).await?.split();
     info!("connected!");
 
-    let msg = Msg::AboutMe { from: node_id, name: name.clone(), at: now() };
+    let msg = Msg::AboutMe { name: name.clone(), at: now() };
     sender.broadcast(msg.to_vec().into()).await?;
 
     let members = std::sync::Arc::new(RwLock::new(HashMap::new()));

@@ -1,8 +1,8 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, process::Command};
 
 use crate::structs::{
-    COMMAND_ME, COMMAND_ONLINE, COMMAND_QUIT, COMMAND_RECEIVE, COMMAND_SEND, COMMAND_SHARE,
-    EOF_EVENT, EOF_MESSAGE, Msg,
+    COMMAND_COMMAND, COMMAND_ME, COMMAND_MEMBERS, COMMAND_QUIT, COMMAND_RECEIVE_FILE,
+    COMMAND_SEND_FILE, COMMAND_SHARE_FILE, EOF_EVENT, EOF_MESSAGE, Msg,
 };
 use crate::transfer::{receive_file, share_file};
 use crate::utils::{now, read_file_to_send, split_first_space};
@@ -70,23 +70,56 @@ pub async fn input_loop(
 
         match command {
             COMMAND_QUIT => {
-                let msg = Msg::Bye { from: node_id, at: now() };
+                let msg = Msg::Bye { at: now() };
                 // broadcast the encoded message
                 sender.broadcast(msg.to_vec().into()).await?;
                 time::sleep(time::Duration::from_millis(100)).await;
                 break;
             }
-            COMMAND_ME => println!("ME: {node_id}, {name}"),
-            COMMAND_ONLINE => {
+            COMMAND_ME => println!("ME: {node_id}, {name}\n{EOF_EVENT}"),
+            COMMAND_MEMBERS => {
                 let members = members.read().await;
 
                 println!("members:");
-                for (node_id, name) in members.iter() {
+                println!("  {node_id}: name");
+                let mut members: Vec<_> = members.iter().collect();
+                members.sort_by(|a, b| a.1.cmp(b.1));
+                for (node_id, name) in members {
                     println!("  {node_id}: {name:?}")
                 }
+
                 info!("{EOF_EVENT}");
             }
-            COMMAND_SEND => {
+            COMMAND_COMMAND => {
+                let args: Vec<String> = match shell_words::split(&line) {
+                    Ok(v) if v.len() > 1 => v[1..].iter().map(|v| v.into()).collect(),
+                    _ => {
+                        warn!("{COMMAND_COMMAND} expected: <args>...\n{EOF_EVENT}");
+                        continue;
+                    }
+                };
+
+                info!("--> {COMMAND_COMMAND} started: {args:?}\n{EOF_EVENT}");
+                tokio::task::spawn_blocking(move || {
+                    // Command.current_dir("/").env("PATH", "/bin")
+                    let output = match Command::new(&args[0]).args(&args[1..]).output() {
+                        Ok(v) => v,
+                        Err(e) => {
+                            error!("{COMMAND_COMMAND} error: {e}\n{EOF_EVENT}");
+                            return;
+                        }
+                    };
+
+                    if output.status.success() {
+                        let stdout = String::from_utf8_lossy(&output.stdout);
+                        info!("{COMMAND_COMMAND} stdout: {args:?}\n{stdout}\n{EOF_EVENT}");
+                    } else {
+                        let stderr = String::from_utf8_lossy(&output.stderr);
+                        error!("{COMMAND_COMMAND} stderr: {args:?}\n{stderr}\n{EOF_EVENT}");
+                    }
+                });
+            }
+            COMMAND_SEND_FILE => {
                 // let (filepath, _) = split_first_space(&line[COMMAND_SEND.len()..], true);
                 //if filepath.is_empty() {
                 //    warn!("no input file\n{EOF_EVENT}");
@@ -96,26 +129,26 @@ pub async fn input_loop(
                 let filepath = match shell_words::split(&line) {
                     Ok(args) if args.len() == 2 => args[1].clone(),
                     _ => {
-                        warn!("expected {COMMAND_SEND} <filepath>\n{EOF_EVENT}");
+                        warn!("{COMMAND_SEND_FILE} expected: <filepath>\n{EOF_EVENT}");
                         continue;
                     }
                 };
 
                 let filename = filepath.to_string();
                 let msg = match read_file_to_send(&filename).await {
-                    Ok(content) => Msg::File { from: node_id, filename, content },
+                    Ok(content) => Msg::SendFile { filename, content },
                     Err(e) => {
-                        error!("SendFile: {filepath}, {e:?}\n{EOF_EVENT}");
+                        error!("{COMMAND_SEND_FILE} error: {filepath}, {e:?}\n{EOF_EVENT}");
                         continue;
                     }
                 };
 
                 match sender.broadcast(msg.to_vec().into()).await {
-                    Ok(_) => info!("--> SendFile: {filepath}\n{EOF_EVENT}"),
-                    Err(e) => error!("SendFile: {filepath}, {e:?}\n{EOF_EVENT}"),
+                    Ok(_) => info!("{COMMAND_SEND_FILE}: {filepath}\n{EOF_EVENT}"),
+                    Err(e) => error!("{COMMAND_SEND_FILE} error: {filepath}, {e:?}\n{EOF_EVENT}"),
                 }
             }
-            COMMAND_SHARE => {
+            COMMAND_SHARE_FILE => {
                 //let (filename, _) = split_first_space(&line[COMMAND_SHARE.len()..], true);
                 //if filename.is_empty() {
                 //    warn!("no input file\n{EOF_EVENT}");
@@ -125,7 +158,7 @@ pub async fn input_loop(
                 let filename = match shell_words::split(&line) {
                     Ok(args) if args.len() == 2 => args[1].clone(),
                     _ => {
-                        warn!("expected {COMMAND_SHARE} <filepath>\n{EOF_EVENT}");
+                        warn!("{COMMAND_SHARE_FILE} expected: <filepath>\n{EOF_EVENT}");
                         continue;
                     }
                 };
@@ -134,21 +167,20 @@ pub async fn input_loop(
                 let (size, ticket) = match share_file(blobs_client, node_id, &filename).await {
                     Ok(v) => v,
                     Err(e) => {
-                        error!("ShareFile:\n{filename}, {e:?}\n{EOF_EVENT}");
+                        error!("{COMMAND_SHARE_FILE}: {filename}, {e:?}\n{EOF_EVENT}");
                         continue;
                     }
                 };
-                info!("--> ShareFile: size={size}\n{ticket} {filename}\n{EOF_EVENT}");
+                info!("{COMMAND_SHARE_FILE} blobs: size={size}\n{ticket} {filename}\n{EOF_EVENT}");
 
-                let msg =
-                    Msg::Share { from: node_id, filename: filename.to_string(), size, ticket };
+                let msg = Msg::ShareFile { filename: filename.to_string(), size, ticket };
 
                 match sender.broadcast(msg.to_vec().into()).await {
-                    Ok(_) => info!(">>> You({:?})\n{EOF_MESSAGE}", name),
-                    Err(e) => error!("BroadcastShare: {e:?}\n{EOF_EVENT}"),
+                    Ok(_) => info!("{COMMAND_SHARE_FILE} broadcast ok\n{EOF_MESSAGE}"),
+                    Err(e) => error!("{COMMAND_SHARE_FILE} broadcast error: {e:?}\n{EOF_EVENT}"),
                 }
             }
-            COMMAND_RECEIVE => {
+            COMMAND_RECEIVE_FILE => {
                 //let (ticket, filename) = split_first_space(&line[COMMAND_RECEIVE.len()..], true);
 
                 //let filename = match filename {
@@ -162,7 +194,7 @@ pub async fn input_loop(
                 let (ticket, filename) = match shell_words::split(&line) {
                     Ok(args) if args.len() == 3 => (args[1].clone(), args[2].clone()),
                     _ => {
-                        warn!("expect {COMMAND_RECEIVE} <ticket> <filepath>\n{EOF_EVENT}");
+                        warn!("{COMMAND_RECEIVE_FILE} expect: <ticket> <filepath>\n{EOF_EVENT}");
                         continue;
                     }
                 };
@@ -170,22 +202,24 @@ pub async fn input_loop(
                 let ticket: BlobTicket = match ticket.parse() {
                     Ok(v) => v,
                     Err(e) => {
-                        warn!("invalid ticket: {e:?}\n{EOF_EVENT}");
+                        warn!("{COMMAND_RECEIVE_FILE} invalid ticket: {e:?}\n{EOF_EVENT}");
                         continue;
                     }
                 };
 
                 match receive_file(blobs_client, ticket, filename.to_string()).await {
-                    Ok(v) => info!("<-- ReceivedFile: {filename}\n{v}\n{EOF_EVENT}"),
-                    Err(e) => error!("ReceivedFile: {filename}, {e:?}\n{EOF_EVENT}"),
+                    Ok(v) => info!("{COMMAND_RECEIVE_FILE} ok: {filename}\n{v}\n{EOF_EVENT}"),
+                    Err(e) => {
+                        error!("{COMMAND_RECEIVE_FILE} error: {filename}, {e:?}\n{EOF_EVENT}")
+                    }
                 }
             }
             _ => {
-                let msg = Msg::Message { from: node_id, text: text };
+                let msg = Msg::Message { text: text };
 
                 match sender.broadcast(msg.to_vec().into()).await {
                     Ok(_) => info!(">>> You({:?})\n{EOF_MESSAGE}", name),
-                    Err(e) => error!("BroadcastMsg: {e:?}\n{EOF_MESSAGE}"),
+                    Err(e) => error!("BroadcastMsg error: {e:?}\n{EOF_MESSAGE}"),
                 }
             }
         }

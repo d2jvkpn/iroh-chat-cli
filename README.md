@@ -51,22 +51,27 @@ How are you today?\n
 ::quit\n
 ```
 
-5. show online accounts
+5. show online members
 ```
-::online\n
+::members\n
 ```
 
 6. send a small file directly (max size=8M)
 ```
-::send path/to/file\n
+::send_file path/to/file\n
 ```
 
 7. share a file (any size)
 ```
-::share path/to/file\n
+::share_file path/to/file\n
 ```
 
 8. receive a shared file
 ```
-::receive blobs_ticket path/to/save\n
+::receive_file blobs_ticket path/to/save\n
+```
+
+9. execute a command(local)
+```
+::command ls -alh
 ```
