@@ -85,7 +85,7 @@ pub async fn subscribe_loop(
                 }
 
                 if let Err(e) = sender.broadcast(about_me.to_bytes().into()).await {
-                    error!("Broadcast AbountMe: {e:?}");
+                    error!("AboutMe broadcast error: {e:?}");
                 }
             }
             Msg::Message { text } => {
@@ -111,7 +111,7 @@ pub async fn subscribe_loop(
             }
             Msg::ShareFile { filename, size, ticket } => {
                 let entry = get_entry(&from).await;
-                info!("<-- Got Share: {entry}, size={size}\n{ticket} {filename}");
+                info!("<-- Got ShareFile: {entry}, size={size}\n{ticket} {filename}");
             }
         }
 

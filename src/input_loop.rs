@@ -79,17 +79,15 @@ pub async fn input_loop(
                 time::sleep(time::Duration::from_millis(100)).await;
                 break;
             }
-            COMMAND_ME => println!("{command}: {node_id}, {name}"),
+            COMMAND_ME => println!("node_id={node_id}, name={name}"),
             COMMAND_MEMBERS => {
                 let members = members.read().await;
-
-                println!("{command}:");
-                println!("  {node_id}: name");
+                println!("- {node_id}: {name:?}");
 
                 let mut members: Vec<_> = members.iter().collect();
                 members.sort_by(|a, b| a.1.cmp(b.1));
                 for (node_id, name) in members {
-                    println!("  {node_id}: {name:?}")
+                    println!("- {node_id}: {name:?}")
                 }
             }
             COMMAND_COMMAND => {
@@ -148,8 +146,8 @@ pub async fn input_loop(
                 };
 
                 match sender.broadcast(msg.to_vec().into()).await {
-                    Ok(_) => info!("{command} ok: {filepath}"),
-                    Err(e) => error!("{command} error: {filepath}, {e:?}"),
+                    Ok(_) => info!("{command} broadcast ok: {filepath}"),
+                    Err(e) => error!("{command} broadcast error: {filepath}, {e:?}"),
                 }
             }
             COMMAND_SHARE_FILE => {
@@ -223,8 +221,8 @@ pub async fn input_loop(
                 let msg = Msg::Message { text: text };
 
                 match sender.broadcast(msg.to_vec().into()).await {
-                    Ok(_) => info!("Message broadcast ok: you({:?})", name),
-                    Err(e) => error!("Message broadcast error: {e:?}"),
+                    Ok(_) => info!(">>> Message: you({:?})", name),
+                    Err(e) => error!(">>> Message: {e:?}"),
                 }
             }
         }
