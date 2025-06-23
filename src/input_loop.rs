@@ -1,4 +1,4 @@
-use std::{collections::HashMap, path, process::Command};
+use std::{collections::HashMap, path, process::Command, time::Instant};
 
 use crate::structs::{
     COMMAND_COMMAND, COMMAND_ME, COMMAND_MEMBERS, COMMAND_QUIT, COMMAND_RECEIVE_FILE,
@@ -91,7 +91,7 @@ pub async fn input_loop(
                 }
             }
             COMMAND_COMMAND => {
-                let args: Vec<String> = match shell_words::split(&line) {
+                let args: Vec<String> = match shell_words::split(&text.replace("\n", " ")) {
                     Ok(v) if v.len() > 1 => v[1..].iter().map(|v| v.into()).collect(),
                     _ => {
                         warn!("{command} expected: <args>...\n{EOF_BLOCK}");
@@ -99,25 +99,34 @@ pub async fn input_loop(
                     }
                 };
 
-                info!("{command} started: {args:?}");
+                // info!("{command} started: {args:?}");
 
                 let command = command.to_string();
                 tokio::task::spawn_blocking(move || {
+                    let start = Instant::now();
+
                     // Command.current_dir("/").env("PATH", "/bin")
                     let output = match Command::new(&args[0]).args(&args[1..]).output() {
                         Ok(v) => v,
                         Err(e) => {
-                            error!("{command} error:\n {args:?}: {e}\n{EOF_BLOCK}");
+                            error!("{command} error: {args:?}, {e}\n{EOF_BLOCK}");
                             return;
                         }
                     };
 
+                    let elapsed = start.elapsed();
                     if output.status.success() {
                         let stdout = String::from_utf8_lossy(&output.stdout);
-                        info!("{command} success: {args:?}\nstdout: {stdout}");
+                        info!(
+                            "{} success: {:?}\nelapsed: {:?}, stdout: \n{}\n{}",
+                            command, args, elapsed, stdout, EOF_BLOCK,
+                        );
                     } else {
                         let stderr = String::from_utf8_lossy(&output.stderr);
-                        error!("{command} failed: {args:?}\nstderr: \n{stderr}");
+                        error!(
+                            "{} failed: {:?}\n\nelapsed: {:?}, stderr: \n{}\n{}",
+                            command, args, elapsed, stderr, EOF_BLOCK,
+                        );
                     }
                 });
             }
@@ -128,7 +137,7 @@ pub async fn input_loop(
                 //    continue;
                 //};
 
-                let filepath = match shell_words::split(&line) {
+                let filepath = match shell_words::split(&text.replace("\n", " ")) {
                     Ok(args) if args.len() == 2 => args[1].clone(),
                     _ => {
                         warn!("{command} expected: <filepath>\n{EOF_BLOCK}");
@@ -164,7 +173,7 @@ pub async fn input_loop(
                 //    continue;
                 //};
 
-                let filepath = match shell_words::split(&line) {
+                let filepath = match shell_words::split(&text.replace("\n", " ")) {
                     Ok(args) if args.len() == 2 => args[1].clone(),
                     _ => {
                         warn!("{command} expected: <filepath>\n{EOF_BLOCK}");
@@ -209,7 +218,7 @@ pub async fn input_loop(
                 //    }
                 //};
 
-                let (ticket, filepath) = match shell_words::split(&line) {
+                let (ticket, filepath) = match shell_words::split(&text.replace("\n", " ")) {
                     Ok(args) if args.len() == 3 => (args[1].clone(), args[2].clone()),
                     _ => {
                         warn!("{command} expect: <ticket> <filepath>\n{EOF_BLOCK}");
@@ -225,9 +234,13 @@ pub async fn input_loop(
                     }
                 };
 
-                match receive_file(blobs_client, ticket, filepath.to_string()).await {
-                    Ok(v) => info!("{command} ok: {filepath}, {v}"),
-                    Err(e) => error!("{command} error: {filepath}, {e:?}"),
+                let start = Instant::now();
+                let result = receive_file(blobs_client, ticket, filepath.to_string()).await;
+                let elapsed = start.elapsed();
+
+                match result {
+                    Ok(v) => info!("{command} ok: {filepath:?}, {elapsed:?}, {v}"),
+                    Err(e) => error!("{command} error: {filepath:?}, {elapsed:?}, {e:?}"),
                 }
             }
             v if v.starts_with(":") => error!("Unknown command: {v:?}"),
