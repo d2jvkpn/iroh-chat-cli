@@ -137,7 +137,7 @@ async fn main() -> Result<()> {
 
     let relay_map = if args.relay_url.is_empty() {
         iroh::defaults::prod::default_relay_map()
-    } else if args.relay_url.len() == 1 && args.relay_url[0] == "" {
+    } else if args.relay_url.len() == 1 && args.relay_url[0] == "none" {
         RelayMap::empty()
     } else {
         let mut urls = Vec::with_capacity(args.relay_url.len());
