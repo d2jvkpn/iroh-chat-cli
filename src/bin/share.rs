@@ -1,7 +1,9 @@
+use std::path;
+
 use iroh_chat_cli::transfer::{receive_file, share_file};
 use iroh_chat_cli::utils;
 
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use iroh::{Endpoint, protocol::Router};
 use iroh_blobs::{net_protocol::Blobs, ticket::BlobTicket};
 use tokio::fs;
@@ -30,23 +32,28 @@ async fn main() -> Result<()> {
     let blobs_client = blobs.client();
 
     match arg_refs.as_slice() {
-        ["share", filename] => {
-            let (size, ticket) = share_file(blobs_client, node_id, filename).await?;
+        ["share", filepath] => {
+            let (size, ticket) = share_file(blobs_client, node_id, filepath).await?;
+
+            let basename = path::Path::new(&filepath)
+                .file_name()
+                .ok_or(anyhow!("get filename"))
+                .map(|v| v.to_string_lossy().to_string())?;
 
             fs::create_dir_all("configs").await?;
             fs::write("configs/share_file.bob.ticket", ticket.to_string()).await?;
-            info!("==> SharingFile: size={size},\n{ticket} {filename}");
+            info!("==> SharingFile: size={size}, {filepath},\n{ticket} {basename}");
 
             tokio::signal::ctrl_c().await?;
             println!("");
             // Gracefully shut down the node
             router.shutdown().await?;
         }
-        ["receive", ticket, filename] => {
+        ["receive", ticket, filepath] => {
             let ticket: BlobTicket = ticket.parse()?;
-            info!("<-- receiving_file: {filename}");
-            receive_file(blobs_client, ticket, filename.to_string()).await?;
-            info!("<-- received_file: {filename}");
+            info!("<-- receiving_file: {filepath}");
+            receive_file(blobs_client, ticket, filepath.to_string()).await?;
+            info!("<-- received_file: {filepath}");
         }
         _ => {
             error!("couldn't parse command line arguments: {args:?}");
