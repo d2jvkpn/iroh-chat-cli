@@ -57,18 +57,18 @@ pub async fn input_loop(
      */
 
     let mut reader = io::BufReader::new(io::stdin()).lines();
-    let mut lines = String::new();
+    let mut buffer = String::new();
 
     while let Some(line) = reader.next_line().await? {
         if line.trim_end_matches(eol).ends_with(' ') {
-            lines.push_str(line.trim_end());
-            lines.push('\n');
+            buffer.push_str(line.trim_end());
+            buffer.push('\n');
             continue;
         }
 
-        lines.push_str(&line);
-        let text = lines.trim_end().to_string();
-        lines.clear();
+        buffer.push_str(&line);
+        let text = buffer.trim_end().to_string();
+        buffer.clear();
 
         let (command, _) = split_first_space(&text, false);
 
@@ -192,23 +192,29 @@ pub async fn input_loop(
                     }
                 };
 
-                // TODO: async, stop sharing
-                let (size, ticket) = match share_file(blobs_client, blobs_node_id, &filepath).await
-                {
-                    Ok(v) => v,
-                    Err(e) => {
-                        error!("{command} error: {filepath}, {e:?}\n{EOF_BLOCK}");
-                        continue;
+                // TODO: stop sharing
+                let command = command.to_string();
+                let blobs_client = blobs_client.clone();
+                let sender = sender.clone();
+
+                tokio::spawn(async move {
+                    let (size, ticket) =
+                        match share_file(&blobs_client, blobs_node_id, &filepath).await {
+                            Ok(v) => v,
+                            Err(e) => {
+                                error!("{command} error: {filepath}, {e:?}\n{EOF_BLOCK}");
+                                return;
+                            }
+                        };
+
+                    let msg =
+                        Msg::ShareFile { filename: basename.clone(), size, ticket: ticket.clone() };
+
+                    match sender.broadcast(msg.to_vec().into()).await {
+                        Ok(_) => info!("{command} broadcast ok:\n{ticket} {basename}\n{EOF_BLOCK}"),
+                        Err(e) => error!("{command} broadcast error: {e:?}\n{EOF_BLOCK}"),
                     }
-                };
-
-                let msg =
-                    Msg::ShareFile { filename: basename.clone(), size, ticket: ticket.clone() };
-
-                match sender.broadcast(msg.to_vec().into()).await {
-                    Ok(_) => info!("{command} broadcast ok:\n{ticket} {basename}"),
-                    Err(e) => error!("{command} broadcast error: {e:?}"),
-                }
+                });
             }
             COMMAND_RECEIVE_FILE => {
                 //let (ticket, filename) = split_first_space(&line[COMMAND_RECEIVE.len()..], true);
