@@ -1,11 +1,12 @@
 use std::{collections::HashMap, path, process::Command, time::Instant};
 
+use crate::structs::MAX_FILESIZE;
 use crate::structs::{
-    COMMAND_COMMAND, COMMAND_ME, COMMAND_MEMBERS, COMMAND_QUIT, COMMAND_RECEIVE_FILE,
+    COMMAND_ME, COMMAND_MEMBERS, COMMAND_QUIT, COMMAND_RECEIVE_FILE, COMMAND_RUN,
     COMMAND_SEND_FILE, COMMAND_SHARE_FILE, EOF_BLOCK, Msg,
 };
 use crate::transfer::{receive_file, share_file};
-use crate::utils::{now, read_file_to_send, split_first_space};
+use crate::utils::{local_now, read_file_content, split_first_space};
 
 use anyhow::Result;
 use iroh::{Endpoint, NodeId, RelayMap, RelayMode, protocol::Router};
@@ -73,13 +74,13 @@ pub async fn input_loop(
 
         match command {
             COMMAND_QUIT => {
-                let msg = Msg::Bye { at: now() };
+                let msg = Msg::Bye { at: local_now() };
                 // broadcast the encoded message
                 sender.broadcast(msg.to_vec().into()).await?;
                 time::sleep(time::Duration::from_millis(100)).await;
                 break;
             }
-            COMMAND_ME => println!("node_id={node_id}, name={name}"),
+            COMMAND_ME => println!("node_id={node_id}, name={name:?}"),
             COMMAND_MEMBERS => {
                 let members = members.read().await;
                 println!("- {node_id}: {name:?}");
@@ -90,7 +91,7 @@ pub async fn input_loop(
                     println!("- {node_id}: {name:?}")
                 }
             }
-            COMMAND_COMMAND => {
+            COMMAND_RUN => {
                 let args: Vec<String> = match shell_words::split(&text.replace("\n", " ")) {
                     Ok(v) if v.len() > 1 => v[1..].iter().map(|v| v.into()).collect(),
                     _ => {
@@ -102,6 +103,7 @@ pub async fn input_loop(
                 // info!("{command} started: {args:?}");
 
                 let command = command.to_string();
+
                 tokio::task::spawn_blocking(move || {
                     let start = Instant::now();
 
@@ -115,6 +117,7 @@ pub async fn input_loop(
                     };
 
                     let elapsed = start.elapsed();
+
                     if output.status.success() {
                         let stdout = String::from_utf8_lossy(&output.stdout);
                         info!(
@@ -153,7 +156,7 @@ pub async fn input_loop(
                     }
                 };
 
-                let msg = match read_file_to_send(&filepath).await {
+                let msg = match read_file_content(&filepath, MAX_FILESIZE).await {
                     Ok(content) => Msg::SendFile { filename: basename, content },
                     Err(e) => {
                         error!("{command} error: {filepath}, {e:?}\n{EOF_BLOCK}");
@@ -234,22 +237,33 @@ pub async fn input_loop(
                     }
                 };
 
-                let start = Instant::now();
-                let result = receive_file(blobs_client, ticket, filepath.to_string()).await;
-                let elapsed = start.elapsed();
+                let command = command.to_string();
+                let blobs_client = blobs_client.clone();
 
-                match result {
-                    Ok(v) => info!("{command} ok: {filepath:?}, {elapsed:?}, {v}"),
-                    Err(e) => error!("{command} error: {filepath:?}, {elapsed:?}, {e:?}"),
-                }
+                tokio::spawn(async move {
+                    let start = Instant::now();
+                    let result = receive_file(&blobs_client, ticket, filepath.to_string()).await;
+                    let elapsed = start.elapsed();
+
+                    match result {
+                        Ok(v) => info!(
+                            "{} ok: {:?}, elapsed={:?}, size={}\n{}",
+                            command, filepath, elapsed, v, EOF_BLOCK,
+                        ),
+                        Err(e) => error!(
+                            "{} error: {:?}, elapsed={:?}, error={:?}\n{}",
+                            command, filepath, elapsed, e, EOF_BLOCK,
+                        ),
+                    }
+                });
             }
             v if v.starts_with(":") => error!("Unknown command: {v:?}"),
             _ => {
                 let msg = Msg::Message { text: text };
 
                 match sender.broadcast(msg.to_vec().into()).await {
-                    Ok(_) => info!(">>> Message: you({:?})", name),
-                    Err(e) => error!(">>> Message: {e:?}"),
+                    Ok(_) => info!(">>> Message: you({name:?})"),
+                    Err(e) => error!(">>> Message: you({name:?}), {e:?}"),
                 }
             }
         }

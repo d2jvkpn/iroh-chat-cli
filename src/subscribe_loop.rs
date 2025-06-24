@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::structs::{EOF_BLOCK, Message, Msg};
-use crate::utils::{content_to_file, now};
+use crate::utils::{content_to_file, local_now};
 
 use anyhow::Result;
 use futures_lite::StreamExt;
@@ -16,7 +16,7 @@ pub async fn subscribe_loop(
     mut receiver: GossipReceiver,
     members: std::sync::Arc<RwLock<HashMap<NodeId, String>>>,
 ) -> Result<()> {
-    let about_me = Message::new(Msg::AboutMe { name: name.to_string(), at: now() });
+    let about_me = Message::new(Msg::AboutMe { name: name.to_string(), at: local_now() });
 
     let get_entry = async |from: &PublicKey| {
         // if it's a `Message` message, get the name from the map and print the message
@@ -73,7 +73,7 @@ pub async fn subscribe_loop(
         match msg {
             Msg::Bye { at } => {
                 let entry = remove_entry(&from).await;
-                warn!("<-- Bye: {entry}\n{at}");
+                warn!("<-- Bye: {entry}, {at}");
             }
             Msg::AboutMe { name: peer_name, at } => {
                 let mut members = members.write().await;
@@ -97,17 +97,16 @@ pub async fn subscribe_loop(
                 // tokio::spawn(save_file(entry, filename, content));
                 let size = content.len();
 
-                tokio::spawn(async move {
-                    match content_to_file(content, &filename).await {
-                        Ok(v) => {
-                            info!("<-- Received SendFile: {entry}, {filename}");
-                            println!("size={size}, path={v}");
-                        }
-                        Err(e) => {
-                            error!("!!! Received SendFile: {entry}, {filename}, {e:?}");
-                        }
+                // tokio::spawn(async move { ... }
+                match content_to_file(content, &filename).await {
+                    Ok(v) => {
+                        info!("<-- Received SendFile: {entry}, {filename}");
+                        println!("size={size}, path={v}");
                     }
-                });
+                    Err(e) => {
+                        error!("Received SendFile: {entry}, {filename}, {e:?}");
+                    }
+                };
             }
             Msg::ShareFile { filename, size, ticket } => {
                 let entry = get_entry(&from).await;

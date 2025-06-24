@@ -7,6 +7,7 @@ use crossterm::{
     terminal::{Clear, ClearType, disable_raw_mode, enable_raw_mode},
 };
 
+#[test]
 fn main() -> std::io::Result<()> {
     enable_raw_mode()?;
 
@@ -50,7 +51,7 @@ fn main() -> std::io::Result<()> {
                 write!(stdout, "> ")?;
             }
             v => {
-                write!(stdout, "OtherKey::{v}_")?;
+                write!(stdout, "OTHER_KEY::{v}_")?;
                 // execute!(stdout, MoveToColumn(0), Clear(ClearType::CurrentLine))?;
             }
         }

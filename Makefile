@@ -7,8 +7,23 @@ secret_key:
 	#head -c 32 /dev/urandom | base64
 	#head -c 32 /dev/urandom | xxd -p -c 32
 
+check:
+	cargo check --tests
+
+test_bins:
+	cargo test --bins --
+
+test_utils:
+	cargo test --lib -- utils --show-output
+
 test01:
-	cargo run --bin test01
+	cargo test --test test01
+
+test02:
+	cargo test --test test02
+
+test03:
+	cargo test --test test03
 
 Alice:
 	cargo run --bin iroh-chat-cli --  --name Alice -w configs/Alice.topic.ticket open

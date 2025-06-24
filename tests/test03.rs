@@ -8,6 +8,7 @@ use crossterm::{
     terminal::{Clear, ClearType, disable_raw_mode, enable_raw_mode},
 };
 
+#[test]
 fn main() -> std::io::Result<()> {
     enable_raw_mode()?;
 

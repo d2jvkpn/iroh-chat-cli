@@ -5,7 +5,7 @@ use crate::structs::MAX_FILESIZE;
 use anyhow::{Result, anyhow};
 use iroh::SecretKey;
 //use rand::RngCore;
-use chrono::{Local, SecondsFormat};
+use chrono::{Local, SecondsFormat, Utc};
 use rand::prelude::*;
 use serde_yaml::Value;
 use tokio::fs;
@@ -24,7 +24,7 @@ pub fn config_get<'a>(value: &'a Value, sub: &str) -> Option<&'a Value> {
     sub.split('.').fold(Some(value), |acc, key| acc?.get(key))
 }
 
-pub fn now() -> String {
+pub fn local_now() -> String {
     let now = Local::now();
     return now.to_rfc3339_opts(SecondsFormat::Millis, true);
 }
@@ -91,11 +91,15 @@ pub fn log2file(app: &str, filter: EnvFilter) -> WorkerGuard {
     guard
 }
 
-pub async fn read_file_to_send(filename: &str) -> Result<Vec<u8>> {
+pub async fn read_file_content(filename: &str, max_size: u64) -> Result<Vec<u8>> {
     let filepath = path::Path::new(&filename);
 
-    if !(filepath.exists() && filepath.is_file()) {
-        return Err(anyhow!("invalid input file"));
+    if !filepath.exists() {
+        return Err(anyhow!("file not exists"));
+    }
+
+    if !filepath.is_file() {
+        return Err(anyhow!("not a file"));
     }
 
     /*
@@ -111,8 +115,8 @@ pub async fn read_file_to_send(filename: &str) -> Result<Vec<u8>> {
     let metadata =
         fs::metadata(&filepath).await.map_err(|e| anyhow!("failed to read file, {e:?}"))?;
 
-    if metadata.len() > MAX_FILESIZE {
-        return Err(anyhow!("file size is large than {MAX_FILESIZE}"));
+    if metadata.len() > max_size {
+        return Err(anyhow!("file size is large than {max_size}"));
     }
 
     // info!("--> SendingFile: {filename}\n{EOF_EVENT}");
@@ -137,8 +141,9 @@ pub async fn content_to_file(content: Vec<u8>, filename: &str) -> Result<String>
     };
 
     // let prefix = Local::now().format("%Y-%m-%d-%s").to_string();
-    let dir =
-        path::Path::new("data").join("downloads").join(Local::now().format("%Y-%m-%d").to_string());
+    let dir = path::Path::new("data")
+        .join("received_files")
+        .join(Utc::now().format("%Y-%m-%d-utc").to_string());
 
     let filepath = dir.join(filename);
 

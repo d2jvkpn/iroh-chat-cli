@@ -73,5 +73,5 @@ How are you today?\n
 
 9. 本地执行一个命令
 ```
-::command ls -alh
+::run ls -alh
 ```

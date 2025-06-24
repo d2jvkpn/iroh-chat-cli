@@ -2,7 +2,7 @@ use std::path;
 
 use anyhow::{Result, anyhow};
 use iroh::NodeId;
-use iroh_blobs::rpc::client::blobs::{MemClient, WrapOption};
+use iroh_blobs::rpc::client::blobs::{DownloadOutcome, ExportOutcome, MemClient, WrapOption};
 use iroh_blobs::store::{ExportFormat, ExportMode};
 use iroh_blobs::{ticket::BlobTicket, util::SetTagOption};
 use tokio::fs;
@@ -39,7 +39,7 @@ pub async fn receive_file(
     blobs_client: &MemClient,
     ticket: BlobTicket,
     filename: String,
-) -> Result<String> {
+) -> Result<u64> {
     let filepath: path::PathBuf = filename.parse()?;
     let filepath = path::absolute(filepath)?;
 
@@ -48,14 +48,16 @@ pub async fn receive_file(
     }
 
     // println!("==> Starting download: {filename}");
-    blobs_client.download(ticket.hash(), ticket.node_addr().clone()).await?.finish().await?;
-    // println!("--> Finished download, copying to destination: {filename}");
+    let download_outcome: DownloadOutcome =
+        blobs_client.download(ticket.hash(), ticket.node_addr().clone()).await?.finish().await?;
 
-    let export_outcome = blobs_client
+    // println!("--> Finished download, copying to destination: {filename}");
+    let _export_outcome: ExportOutcome = blobs_client
         .export(ticket.hash(), filepath.clone(), ExportFormat::Blob, ExportMode::Copy)
         .await?
         .finish()
         .await?;
 
-    Ok(format!("{:?}", export_outcome))
+    // dbg!(&download_outcome);
+    Ok(download_outcome.downloaded_size)
 }

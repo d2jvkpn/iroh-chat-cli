@@ -1,7 +1,6 @@
 use iroh_chat_cli::utils;
 
 use tokio::io::{self, AsyncBufReadExt, AsyncWriteExt, BufReader};
-use tokio::signal;
 use tokio::time::{Duration, timeout};
 use tracing::{error, info, instrument, warn}; // Level
 use tracing_subscriber::EnvFilter;
@@ -16,7 +15,7 @@ fn my_func(x: i32) {
     info!("exit my_func");
 }
 
-#[tokio::main]
+#[tokio::test]
 async fn main() -> io::Result<()> {
     // let _guard = utils::log2file("test01.log", "info");
     utils::log2stdout(EnvFilter::new(format!("{}={}", module_path!(), "info")));
@@ -46,14 +45,17 @@ async fn main() -> io::Result<()> {
             }
 
             // Ctrl+C support
-            _ = signal::ctrl_c() => {
+            /*
+            _ = tokio::signal::ctrl_c() => {
                 println!("");
                 warn!("received Ctrl+C, exiting.");
                 break;
             }
+            */
         };
 
         match line {
+            Ok(Some(val)) if &val == "::quit" => break,
             Ok(Some(v)) => info!(">>> you: {}", v),
             Ok(None) => {
                 warn!("end of input (EOF), exiting.");

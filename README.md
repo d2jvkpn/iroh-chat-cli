@@ -71,7 +71,7 @@ How are you today?\n
 ::receive_file blobs_ticket path/to/save\n
 ```
 
-9. execute a command(local)
+9. run a local command
 ```
-::command ls -alh
+::run ls -alh
 ```

@@ -1,7 +1,7 @@
 use std::{collections::HashMap, fmt::Debug, path, str::FromStr};
 
 use iroh_chat_cli::structs::{Msg, TopicTicket};
-use iroh_chat_cli::utils::{self, now};
+use iroh_chat_cli::utils::{self, local_now};
 use iroh_chat_cli::{input_loop, subscribe_loop};
 
 use anyhow::Result;
@@ -18,8 +18,14 @@ const BUILD_INFO: &str = concat!(
     "\nBuildInfo: \n",
     "  build_time: ",
     env!("BUILD_TIME"),
+    "\n  version: ",
+    env!("CARGO_PKG_VERSION"),
+    "\n  git_registry: ",
+    env!("GIT_REGISTRY"),
     "\n  git_branch: ",
     env!("GIT_BRANCH"),
+    "\n  git_status: ",
+    env!("GIT_STATUS"),
     "\n  git_commit_hash: ",
     env!("GIT_COMMIT_HASH"),
     "\n  git_commit_time: ",
@@ -214,7 +220,7 @@ async fn main() -> Result<()> {
     let (sender, receiver) = gossip.subscribe_and_join(topic, node_ids).await?.split();
     info!("connected!");
 
-    let msg = Msg::AboutMe { name: name.clone(), at: now() };
+    let msg = Msg::AboutMe { name: name.clone(), at: local_now() };
     sender.broadcast(msg.to_vec().into()).await?;
 
     let members = std::sync::Arc::new(RwLock::new(HashMap::new()));

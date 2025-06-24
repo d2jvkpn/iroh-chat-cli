@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 pub const COMMAND_QUIT: &str = "::quit";
 pub const COMMAND_ME: &str = "::me";
 pub const COMMAND_MEMBERS: &str = "::members";
-pub const COMMAND_COMMAND: &str = "::command";
+pub const COMMAND_RUN: &str = "::run";
 
 pub const COMMAND_SEND_FILE: &str = "::send_file";
 pub const COMMAND_SHARE_FILE: &str = "::share_file";
