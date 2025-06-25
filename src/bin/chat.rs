@@ -55,9 +55,6 @@ struct Command {
     #[arg(short = 'r', long, action=ArgAction::Append)]
     relay_url: Vec<String>,
 
-    #[arg(short = 'w', long)]
-    write_ticket: Option<String>,
-
     #[clap(short, long)] // default_value = "configs/local.yaml"
     config: Option<String>,
 
@@ -72,12 +69,18 @@ struct Command {
 enum Subcommand {
     /// Open a chat room for a topic and print a ticket for others to join.
     // Open,
-    Open,
+    Open {
+        #[arg(short = 'w', long)]
+        write_ticket: Option<String>,
+    },
 
     /// Join a chat room from a ticket.
     Join {
         /// The ticket, as base64 string.
         ticket: String,
+
+        #[arg(short = 'w', long)]
+        write_ticket: Option<String>,
     },
     // Join(JoinCommand),
 }
@@ -108,17 +111,23 @@ async fn main() -> Result<()> {
     };
     utils::log2stdout(filter);
 
-    let (topic, ticket_nodes) = match &args.subcommand {
-        Subcommand::Open => {
+    let (topic, ticket_nodes, write_ticket) = match &args.subcommand {
+        Subcommand::Open { write_ticket } => {
             let topic = TopicId::from_bytes(rand::random());
             println!("==> Opening chat room for topic {topic}");
-            (topic, vec![])
+            (topic, vec![], write_ticket)
         }
-        Subcommand::Join { ticket } => {
-            let TopicTicket { topic, nodes } = TopicTicket::from_str(&ticket)?;
-            println!("==> Joining chat room for topic {topic}");
-            println!("    nodes_in_ticket: {nodes:?}");
-            (topic, nodes)
+        Subcommand::Join { ticket: ticket_str, write_ticket } => {
+            // let TopicTicket { topic, nodes } = if ticket.contains(".") {
+            let topic_ticket = if ticket_str.contains(".") {
+                let ticket_str = fs::read_to_string(&ticket_str).await?;
+                TopicTicket::from_str(&ticket_str.trim())?
+            } else {
+                TopicTicket::from_str(ticket_str)?
+            };
+
+            println!("==> Joining chat room for ticket: {topic_ticket:?}");
+            (topic_ticket.topic, topic_ticket.nodes, write_ticket)
         }
     };
 
@@ -193,10 +202,12 @@ async fn main() -> Result<()> {
     println!("--> node_id: {}", node_id);
     println!("    relay_url: {:?}", node_addr.relay_url());
     println!("    direct_addresses: {:?}", node_addr.direct_addresses().collect::<Vec<_>>());
-    if let Some(v) = args.write_ticket {
+    if let Some(v) = write_ticket {
         write_topic_ticket(&ticket, &v).await?;
+        println!("    ticket: {}", v);
+    } else {
+        println!("    ticket: {ticket}");
     }
-    println!("    ticket: {ticket}");
 
     // join the gossip topic by connecting to known nodes, if any
     let node_ids = ticket_nodes.iter().map(|p| p.node_id).collect();
@@ -232,9 +243,7 @@ async fn main() -> Result<()> {
         error!("input_loop: {e:?}");
     }
 
-    if let Err(e) = router.shutdown().await {
-        error!("router.shutdown: {e:?}");
-    }
+    router.shutdown().await?;
 
     warn!("<== Quit");
     Ok(())
@@ -253,7 +262,6 @@ pub async fn write_topic_ticket(ticket: &TopicTicket, filename: &str) -> Result<
     // file.write_all(&ticket.to_bytes()).await?;
     file.write_all(&ticket.base32_bytes()).await?;
     file.write_all(b"\n").await?;
-    println!("    saved_ticket: {}", filepath.display());
 
     Ok(())
 }

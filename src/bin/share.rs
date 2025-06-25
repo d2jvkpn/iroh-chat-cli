@@ -32,7 +32,7 @@ async fn main() -> Result<()> {
     let blobs_client = blobs.client();
 
     match arg_refs.as_slice() {
-        ["share", filepath] => {
+        ["share", filepath] | ["share", filepath, _] => {
             let (size, ticket) = share_file(blobs_client, node_id, filepath).await?;
 
             let basename = path::Path::new(&filepath)
@@ -40,9 +40,20 @@ async fn main() -> Result<()> {
                 .ok_or(anyhow!("get filename"))
                 .map(|v| v.to_string_lossy().to_string())?;
 
-            fs::create_dir_all("configs").await?;
-            fs::write("configs/share_file.bob.ticket", ticket.to_string()).await?;
-            info!("==> SharingFile: size={size}, {filepath},\n{ticket} {basename}");
+            if arg_refs.len() > 2 {
+                let save_path = path::Path::new(arg_refs[2]);
+                if let Some(p) = save_path.parent() {
+                    fs::create_dir_all(p).await?;
+                }
+
+                fs::write(save_path, ticket.to_string()).await?;
+                info!(
+                    "==> SharingFile: size={size}, {filepath}\n{} {basename}",
+                    save_path.display()
+                );
+            } else {
+                info!("==> SharingFile: size={size}, {filepath}\n{ticket} {basename}");
+            }
 
             tokio::signal::ctrl_c().await?;
             println!("");
@@ -50,7 +61,13 @@ async fn main() -> Result<()> {
             router.shutdown().await?;
         }
         ["receive", ticket, filepath] => {
-            let ticket: BlobTicket = ticket.parse()?;
+            let ticket: BlobTicket = if ticket.contains(".") {
+                let ticket = fs::read_to_string(&ticket).await?;
+                ticket.parse()?
+            } else {
+                ticket.parse()?
+            };
+
             info!("<-- receiving_file: {filepath}");
             receive_file(blobs_client, ticket, filepath.to_string()).await?;
             info!("<-- received_file: {filepath}");

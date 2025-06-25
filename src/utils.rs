@@ -126,7 +126,7 @@ pub async fn read_file_content(filename: &str, max_size: u64) -> Result<Vec<u8>>
     //    continue;
     //})?;
 
-    fs::read(&filepath).await.map_err(|e| anyhow!("failed to write file, {e:?}"))
+    fs::read(&filepath).await.map_err(|e| anyhow!("failed to read file, {e:?}"))
 }
 
 pub async fn content_to_file(content: Vec<u8>, filename: &str) -> Result<String> {

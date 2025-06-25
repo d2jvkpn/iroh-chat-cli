@@ -63,7 +63,7 @@ pub struct TopicTicket {
 }
 
 impl TopicTicket {
-    fn from_bytes(bytes: &[u8]) -> Result<Self> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
         serde_json::from_slice(bytes).map_err(Into::into)
     }
 

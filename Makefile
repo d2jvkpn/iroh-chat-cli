@@ -26,24 +26,24 @@ test03:
 	cargo test --test test03
 
 Alice:
-	cargo run --bin iroh-chat-cli --  --name Alice -w configs/Alice.topic.ticket open
+	cargo run --bin iroh-chat-cli --  --name Alice open -w configs/Alice.topic.ticket
 
 # $$(awk 'NR==1{printf $$1}' configs/Alice.topic.ticket | base64 -w0)
 
 Bob:
-	cargo run --bin iroh-chat-cli -- --name Bob -w configs/Bob.topic.ticket join \
-	  $$(cat configs/Alice.topic.ticket)
+	cargo run --bin iroh-chat-cli -- --name Bob join \
+	  configs/Alice.topic.ticket -w configs/Bob.topic.ticket
 
 John:
-	cargo run --bin iroh-chat-cli -- --name John -w configs/John.topic.ticket join \
-	  $$(cat configs/Bob.topic.ticket)
+	cargo run --bin iroh-chat-cli -- --name John join \
+	  configs/Bob.topic.ticket -w configs/John.topic.ticket
 
 share_file:
-	cargo run --bin iroh-share-file -- share Cargo.toml
+	cargo run --bin iroh-share-file -- share Cargo.toml configs/share_file.bob.ticket
 
 receive_file:
 	cargo run --bin iroh-share-file -- receive \
-	  $$(cat configs/share_file.bob.ticket) configs/Cargo.toml
+	  configs/share_file.bob.ticket configs/Cargo.toml
 
 release:
 	cargo build --release
