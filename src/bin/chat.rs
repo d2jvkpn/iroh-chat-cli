@@ -55,9 +55,8 @@ struct Command {
     #[arg(short = 'r', long, action=ArgAction::Append)]
     relay_url: Vec<String>,
 
-    #[clap(short, long)] // default_value = "configs/local.yaml"
-    config: Option<String>,
-
+    //#[clap(short, long)] // default_value = "configs/local.yaml"
+    //config: Option<String>,
     #[arg(long)]
     verbose: bool,
 
@@ -131,6 +130,7 @@ async fn main() -> Result<()> {
         }
     };
 
+    /*
     let secret_key: SecretKey = match args.config {
         Some(v) => {
             let yaml = utils::load_yaml(&v).unwrap();
@@ -140,6 +140,8 @@ async fn main() -> Result<()> {
         }
         None => utils::iroh_secret_key(),
     };
+    */
+    let secret_key: SecretKey = utils::iroh_secret_key();
 
     /*
     let relay_map: RelayMap = args
