@@ -16,15 +16,15 @@ version: 0.1.0
 
 2. chat
 ```
-cargo run --bin iroh-chat-cli -- --name Alice open                      # make Alice, the ticket will be printed
-cargo run --bin iroh-chat-cli -- --name Bob join [ticket/ticket_path]   # make Bob
-cargo run --bin iroh-chat-cli -- --name John join [ticket/ticket_path]  # make John
+cargo run --bin iroh-chat-cli -- --name Alice open                          # make Alice, the ticket will be printed
+cargo run --bin iroh-chat-cli -- --name Bob join [ticket_str/ticket_path]   # make Bob
+cargo run --bin iroh-chat-cli -- --name John join [ticket_str/ticket_path]  # make John
 ```
 
 3. share a file
 ```
-cargo run --bin iroh-share-file -- share [filepath] [option(ticket_path)]   # make share_file, share a file
-cargo run --bin iroh-share-file -- receive [ticket/ticket_path] [filepath]  # make receive_file, receive a file
+cargo run --bin iroh-share-file -- share [filepath] [option(ticket_path)]       # make share_file, share a file
+cargo run --bin iroh-share-file -- receive [ticket_str/ticket_path] [filepath]  # make receive_file, receive a file
 ```
 
 
@@ -63,12 +63,12 @@ How are you today?\n
 
 7. share a file (any size)
 ```
-::share_file path/to/file\n
+::share_file [path/to/file]\n
 ```
 
 8. receive a shared file
 ```
-::receive_file blobs_ticket path/to/save\n
+::receive_file [blobs_ticket] [path/to/save]\n
 ```
 
 9. run a local command

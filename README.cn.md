@@ -16,15 +16,15 @@ version: 0.1.0
 
 2. chat
 ```
-cargo run --bin iroh-chat-cli -- --name Alice open                      # make Alice, the ticket will be printed
-cargo run --bin iroh-chat-cli -- --name Bob join [ticket/ticket_path]   # make Bob
-cargo run --bin iroh-chat-cli -- --name John join [ticket/ticket_path]  # make John
+cargo run --bin iroh-chat-cli -- --name Alice open                          # make Alice, the ticket will be printed
+cargo run --bin iroh-chat-cli -- --name Bob join [ticket_str/ticket_path]   # make Bob
+cargo run --bin iroh-chat-cli -- --name John join [ticket_str/ticket_path]  # make John
 ```
 
 3. share a file
 ```
-cargo run --bin iroh-share-file -- share [filepath] [option(ticket_path)]   # make share_file, share a file
-cargo run --bin iroh-share-file -- receive [ticket/ticket_path] [filepath]  # make receive_file, receive a file
+cargo run --bin iroh-share-file -- share [filepath] [option(ticket_path)]       # make share_file, share a file
+cargo run --bin iroh-share-file -- receive [ticket_str/ticket_path] [filepath]  # make receive_file, receive a file
 ``
 
 
@@ -58,17 +58,17 @@ How are you today?\n
 
 6. 直接发送一个小文件（最大支持 8MB）
 ```
-::send_file path/to/file\n
+::send_file [path/to/file]\n
 ```
 
 7. 分享一个任意大小的文件
 ```
-::share_file path/to/file\n
+::share_file [path/to/file]\n
 ```
 
 8. 接收一个被分享的文件
 ```
-::receive_file blobs_ticket path/to/save\n
+::receive_file [blobs_ticket] [path/to/save]\n
 ```
 
 9. 本地执行一个命令
