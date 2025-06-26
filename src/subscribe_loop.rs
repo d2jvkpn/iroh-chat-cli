@@ -11,12 +11,12 @@ use tokio::sync::RwLock;
 use tracing::{error, info, warn}; // Level, instrument
 
 pub async fn subscribe_loop(
-    name: String,
+    node: (NodeId, String),
     sender: GossipSender,
     mut receiver: GossipReceiver,
     members: std::sync::Arc<RwLock<HashMap<NodeId, String>>>,
 ) -> Result<()> {
-    let about_me = Message::new(Msg::AboutMe { name: name.to_string(), at: local_now() });
+    let about_me = Message::new(Msg::AboutMe { name: node.1.clone(), at: local_now() });
 
     let get_entry = async |from: &PublicKey| {
         // if it's a `Message` message, get the name from the map and print the message

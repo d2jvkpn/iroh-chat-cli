@@ -68,7 +68,7 @@ async fn main() -> Result<()> {
                 ticket.parse()?
             };
 
-            info!("<-- receiving_file: {filepath}");
+            info!("<== Receiving_file: {filepath}");
             receive_file(blobs_client, ticket, filepath.to_string()).await?;
             info!("<-- received_file: {filepath}");
         }

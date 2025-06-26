@@ -252,15 +252,13 @@ pub async fn input_loop(
                     let elapsed = start.elapsed();
 
                     match result {
-                        Ok(v) => info!(
-                            "{} ok: {:?}, elapsed={:?}, size={}\n{}",
-                            command, filepath, elapsed, v, EOF_BLOCK,
-                        ),
+                        Ok(v) => info!("{command} ok: {filepath:?}, elapsed={elapsed:?}, size={v}"),
                         Err(e) => error!(
-                            "{} error: {:?}, elapsed={:?}, error={:?}\n{}",
-                            command, filepath, elapsed, e, EOF_BLOCK,
+                            "{} error: {:?}, elapsed={:?}, error={:?}",
+                            command, filepath, elapsed, e,
                         ),
                     }
+                    println!("{}", EOF_BLOCK);
                 });
             }
             v if v.starts_with(":") => error!("Unknown command: {v:?}"),

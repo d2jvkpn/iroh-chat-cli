@@ -55,8 +55,11 @@ struct Command {
     #[arg(short = 'r', long, action=ArgAction::Append)]
     relay_url: Vec<String>,
 
-    //#[clap(short, long)] // default_value = "configs/local.yaml"
-    //config: Option<String>,
+    /*
+    #[clap(short, long)] // default_value = "configs/local.yaml"
+    config: Option<String>,
+    */
+    /// run in debug mode
     #[arg(long)]
     verbose: bool,
 
@@ -67,17 +70,18 @@ struct Command {
 #[derive(Parser, Debug)]
 enum Subcommand {
     /// Open a chat room for a topic and print a ticket for others to join.
-    // Open,
     Open {
+        /// Optional file path to save the ticket; by default, the ticket is printed.
         #[arg(short = 'w', long)]
         write_ticket: Option<String>,
     },
 
     /// Join a chat room from a ticket.
     Join {
-        /// The ticket, as base64 string.
+        /// The ticket can be provided as a base32 string or a file path.
         ticket: String,
 
+        /// Optional file path to save the ticket; by default, the ticket is printed.
         #[arg(short = 'w', long)]
         write_ticket: Option<String>,
     },
@@ -122,26 +126,13 @@ async fn main() -> Result<()> {
                 let ticket_str = fs::read_to_string(&ticket_str).await?;
                 TopicTicket::from_str(&ticket_str.trim())?
             } else {
-                TopicTicket::from_str(ticket_str)?
+                TopicTicket::from_str(&ticket_str)?
             };
 
             println!("==> Joining chat room for ticket: {topic_ticket:?}");
             (topic_ticket.topic, topic_ticket.nodes, write_ticket)
         }
     };
-
-    /*
-    let secret_key: SecretKey = match args.config {
-        Some(v) => {
-            let yaml = utils::load_yaml(&v).unwrap();
-            let val = utils::config_get(&yaml, "iroh.secret_key").unwrap();
-            let val = serde_yaml::to_string(val)?;
-            SecretKey::from_str(&val.trim())?
-        }
-        None => utils::iroh_secret_key(),
-    };
-    */
-    let secret_key: SecretKey = utils::iroh_secret_key();
 
     /*
     let relay_map: RelayMap = args
@@ -167,6 +158,19 @@ async fn main() -> Result<()> {
         RelayMap::from_iter(urls)
     };
 
+    /*
+    let secret_key: SecretKey = match args.config {
+        Some(v) => {
+            let yaml = utils::load_yaml(&v).unwrap();
+            let val = utils::config_get(&yaml, "iroh.secret_key").unwrap();
+            let val = serde_yaml::to_string(val)?;
+            SecretKey::from_str(&val.trim())?
+        }
+        None => utils::iroh_secret_key(),
+    };
+    */
+    let secret_key: SecretKey = utils::iroh_secret_key();
+
     let endpoint = Endpoint::builder()
         .relay_mode(RelayMode::Custom(relay_map.clone()))
         .secret_key(secret_key)
@@ -177,7 +181,7 @@ async fn main() -> Result<()> {
     //let relay_url = endpoint.home_relay().initialized().await.unwrap();
     //println!("==> relay_url: {:?}", relay_url);
 
-    let node_id = endpoint.node_id();
+    let node = (endpoint.node_id(), name.clone());
     // Get our address information, includes our `NodeId`, our `RelayUrl`, and any direct addresses.
     let node_addr = endpoint.node_addr().await?;
 
@@ -189,6 +193,8 @@ async fn main() -> Result<()> {
     // messages and routes them to the correct protocol.
     let router =
         Router::builder(endpoint.clone()).accept(iroh_gossip::ALPN, gossip.clone()).spawn();
+    // println!("iroh_gossip::ALPN: {}", String::from_utf8(iroh_gossip::ALPN.to_vec()).unwrap());
+    // iroh_gossip::ALPN: /iroh-gossip/0
 
     // in our main file, after we create a topic `id`:
     // print a ticket that includes our own node id and endpoint addresses
@@ -201,12 +207,12 @@ async fn main() -> Result<()> {
     // dbg!(&ticket);
 
     // println!("--> node: {node_addr:?}\n    ticket: {ticket}");
-    println!("--> node_id: {}", node_id);
+    println!("--> node: {node:?}");
     println!("    relay_url: {:?}", node_addr.relay_url());
     println!("    direct_addresses: {:?}", node_addr.direct_addresses().collect::<Vec<_>>());
     if let Some(v) = write_ticket {
         write_topic_ticket(&ticket, &v).await?;
-        println!("    ticket: {}", v);
+        println!("    ticket: {v}");
     } else {
         println!("    ticket: {ticket}");
     }
@@ -233,15 +239,15 @@ async fn main() -> Result<()> {
     let (sender, receiver) = gossip.subscribe_and_join(topic, node_ids).await?.split();
     info!("connected!");
 
-    let msg = Msg::AboutMe { name: name.clone(), at: local_now() };
-    sender.broadcast(msg.to_vec().into()).await?;
+    let about_me = Msg::AboutMe { name: name.clone(), at: local_now() };
+    sender.broadcast(about_me.to_vec().into()).await?;
 
     let members = std::sync::Arc::new(RwLock::new(HashMap::new()));
-    tokio::spawn(subscribe_loop(name.clone(), sender.clone(), receiver, members.clone()));
+    tokio::spawn(subscribe_loop(node.clone(), sender.clone(), receiver, members.clone()));
     // broadcast each line we type
     info!("==> Type a message and hit enter to broadcast...");
 
-    if let Err(e) = input_loop((node_id, name.clone()), sender.clone(), members, relay_map).await {
+    if let Err(e) = input_loop(node.clone(), sender.clone(), members, relay_map).await {
         error!("input_loop: {e:?}");
     }
 
