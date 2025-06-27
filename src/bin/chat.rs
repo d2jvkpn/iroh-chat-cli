@@ -15,8 +15,8 @@ use tracing::{error, info, warn}; // Level, instrument
 use tracing_subscriber::EnvFilter;
 
 const BUILD_INFO: &str = concat!(
-    "\nBuildInfo: \n",
-    "  build_time: ",
+    "\nBuildInfo:",
+    "\n  build_time: ",
     env!("BUILD_TIME"),
     "\n  version: ",
     env!("CARGO_PKG_VERSION"),
@@ -30,7 +30,7 @@ const BUILD_INFO: &str = concat!(
     env!("GIT_COMMIT_HASH"),
     "\n  git_commit_time: ",
     env!("GIT_COMMIT_TIME"),
-    "\n"
+    "\n",
 );
 
 /// Chat over iroh-gossip
@@ -207,7 +207,8 @@ async fn main() -> Result<()> {
     // dbg!(&ticket);
 
     // println!("--> node: {node_addr:?}\n    ticket: {ticket}");
-    println!("--> node: {node:?}");
+    println!("--> node_id: {}", node.0);
+    println!("    name: {}", node.1);
     println!("    relay_url: {:?}", node_addr.relay_url());
     println!("    direct_addresses: {:?}", node_addr.direct_addresses().collect::<Vec<_>>());
     if let Some(v) = write_ticket {

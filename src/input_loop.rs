@@ -1,9 +1,8 @@
 use std::{collections::HashMap, path, process::Command, time::Instant};
 
-use crate::structs::MAX_FILESIZE;
 use crate::structs::{
     COMMAND_ME, COMMAND_MEMBERS, COMMAND_QUIT, COMMAND_RECEIVE_FILE, COMMAND_RUN,
-    COMMAND_SEND_FILE, COMMAND_SHARE_FILE, EOF_BLOCK, Msg,
+    COMMAND_SEND_FILE, COMMAND_SHARE_FILE, EOF_BLOCK, MAX_FILESIZE, Msg,
 };
 use crate::transfer::{receive_file, share_file};
 use crate::utils::{local_now, read_file_content, split_first_space};
