@@ -14,7 +14,7 @@ version: 0.1.1
 - https://github.com/n0-computer/iroh-blobs/blob/main/examples/transfer.rs
 - https://github.com/n0-computer/iroh/releases
 
-2. chat
+2. a chat example
 ```
 make Alice  # cargo run --bin iroh-chat-cli -- --name Alice open
 make Bob    # cargo run --bin iroh-chat-cli -- --name Bob join [ticket_str | ticket_path]

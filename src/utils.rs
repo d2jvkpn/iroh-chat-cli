@@ -12,7 +12,7 @@ use tokio::fs;
 // use tracing::{error, info, instrument, warn}; // Level
 use tracing_appender::{non_blocking::WorkerGuard, rolling}; // non_blocking::NonBlocking
 use tracing_subscriber::EnvFilter;
-use tracing_subscriber::fmt::{format, time::FormatTime}; // writer::MakeWriterExt
+use tracing_subscriber::fmt::{self, time::FormatTime}; // writer::MakeWriterExt
 
 pub fn load_yaml(filepath: &str) -> Result<Value> {
     let contents = std::fs::read_to_string(filepath)?;
@@ -60,7 +60,7 @@ pub fn split_first_space(mut s: &str, trim: bool) -> (&str, Option<&str>) {
 struct LogTime;
 
 impl FormatTime for LogTime {
-    fn format_time(&self, w: &mut format::Writer<'_>) -> std::fmt::Result {
+    fn format_time(&self, w: &mut fmt::format::Writer<'_>) -> std::fmt::Result {
         let now = Local::now();
         // write!(w, "{}", now.format("%Y-%m-%dT%H:%M:%S%:z"))
         write!(w, "{}", now.to_rfc3339_opts(SecondsFormat::Millis, true))
@@ -147,8 +147,8 @@ pub async fn content_to_file(content: Vec<u8>, filename: &str) -> Result<String>
 
     let filepath = dir.join(filename);
 
-    fs::create_dir_all(dir.clone()).await.map_err(|e| anyhow!("failed to create dir, {e:?}"))?;
-    fs::write(&filepath, content).await.map(|e| anyhow!("failed to write file, {e:?}"))?;
+    fs::create_dir_all(dir.clone()).await.map_err(|e| anyhow!("failed to create dir: {e:?}"))?;
+    fs::write(&filepath, content).await.map(|e| anyhow!("failed to write file: {e:?}"))?;
 
     Ok(format!("{}", filepath.display()))
 }

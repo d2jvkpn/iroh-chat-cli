@@ -1,6 +1,6 @@
-use std::{collections::HashMap, fmt::Debug, path, str::FromStr};
+use std::{fmt::Debug, path, str::FromStr};
 
-use iroh_chat_cli::structs::{Msg, TopicTicket};
+use iroh_chat_cli::structs::{MemDB, Msg, TopicTicket};
 use iroh_chat_cli::utils::{self, local_now};
 use iroh_chat_cli::{input_loop, subscribe_loop};
 
@@ -10,11 +10,11 @@ use iroh::{Endpoint, NodeAddr, RelayMap, RelayMode, RelayUrl, SecretKey, protoco
 /* RelayUrlParseError, RelayNode */
 use iroh_gossip::{net::Gossip, proto::TopicId};
 use rand::prelude::*;
-use tokio::{fs, io::AsyncWriteExt, sync::RwLock};
+use tokio::{fs, io::AsyncWriteExt};
 use tracing::{error, info, warn}; // Level, instrument
 use tracing_subscriber::EnvFilter;
 
-const BUILD_INFO: &str = concat!(
+const _BUILD_INFO: &str = concat!(
     "\nBuildInfo:",
     "\n  build_time: ",
     env!("BUILD_TIME"),
@@ -33,6 +33,26 @@ const BUILD_INFO: &str = concat!(
     "\n",
 );
 
+pub fn build_info() -> String {
+    format!(
+        r#"BuildInfo:
+  build_time     : {}
+  version        : {}
+  git_registry   : {}
+  git_branch     : {}
+  git_status     : {}
+  git_commit_hash: {}
+  git_commit_time: {}"#,
+        env!("BUILD_TIME"),
+        env!("CARGO_PKG_VERSION"),
+        env!("GIT_REGISTRY"),
+        env!("GIT_BRANCH"),
+        env!("GIT_STATUS"),
+        env!("GIT_COMMIT_HASH"),
+        env!("GIT_COMMIT_TIME"),
+    )
+}
+
 /// Chat over iroh-gossip
 ///
 /// This broadcasts unsigned messages over iroh-gossip.
@@ -41,7 +61,10 @@ const BUILD_INFO: &str = concat!(
 ///
 /// By default, we use the default n0 discovery services to dial by `NodeId`.
 #[derive(Parser, Debug)]
-#[command(name = "iroh-gossip-cli", version = "1.0", about = "p2p chat inrust from scratch", after_help = BUILD_INFO)]
+#[command(
+  name = "iroh-gossip-cli", version = "1.0", about = "p2p chat inrust from scratch",
+  after_help = build_info(),
+)]
 struct Command {
     /*
     /// Set the bind port for our socket. By default, a random port will be used.
@@ -181,7 +204,7 @@ async fn main() -> Result<()> {
     //let relay_url = endpoint.home_relay().initialized().await.unwrap();
     //println!("==> relay_url: {:?}", relay_url);
 
-    let node = (endpoint.node_id(), name.clone());
+    let mem_db = MemDB::new(endpoint.node_id(), name.clone());
     // Get our address information, includes our `NodeId`, our `RelayUrl`, and any direct addresses.
     let node_addr = endpoint.node_addr().await?;
 
@@ -207,8 +230,8 @@ async fn main() -> Result<()> {
     // dbg!(&ticket);
 
     // println!("--> node: {node_addr:?}\n    ticket: {ticket}");
-    println!("--> node_id: {}", node.0);
-    println!("    name: {}", node.1);
+    println!("--> node_id: {}", mem_db.node_id);
+    println!("    name: {}", mem_db.name);
     println!("    relay_url: {:?}", node_addr.relay_url());
     println!("    direct_addresses: {:?}", node_addr.direct_addresses().collect::<Vec<_>>());
     if let Some(v) = write_ticket {
@@ -243,12 +266,11 @@ async fn main() -> Result<()> {
     let about_me = Msg::AboutMe { name: name.clone(), at: local_now() };
     sender.broadcast(about_me.to_vec().into()).await?;
 
-    let members = std::sync::Arc::new(RwLock::new(HashMap::new()));
-    tokio::spawn(subscribe_loop(node.clone(), sender.clone(), receiver, members.clone()));
+    tokio::spawn(subscribe_loop(mem_db.clone(), sender.clone(), receiver));
     // broadcast each line we type
     info!("==> Type a message and hit enter to broadcast...");
 
-    if let Err(e) = input_loop(node.clone(), sender.clone(), members, relay_map).await {
+    if let Err(e) = input_loop(mem_db.clone(), sender.clone(), relay_map).await {
         error!("input_loop: {e:?}");
     }
 

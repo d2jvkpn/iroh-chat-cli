@@ -1,28 +1,22 @@
-use std::{collections::HashMap, path, process::Command, time::Instant};
+use std::{path, process::Command, time::Instant};
 
 use crate::structs::{
     COMMAND_ME, COMMAND_MEMBERS, COMMAND_QUIT, COMMAND_RECEIVE_FILE, COMMAND_RUN,
-    COMMAND_SEND_FILE, COMMAND_SHARE_FILE, EOF_BLOCK, MAX_FILESIZE, Msg,
+    COMMAND_SEND_FILE, COMMAND_SHARE_FILE, EOF_BLOCK, MAX_FILESIZE, MemDB, Msg,
 };
 use crate::transfer::{receive_file, share_file};
 use crate::utils::{local_now, read_file_content, split_first_space};
 
 use anyhow::Result;
-use iroh::{Endpoint, NodeId, RelayMap, RelayMode, protocol::Router};
+use iroh::{Endpoint, RelayMap, RelayMode, protocol::Router};
 use iroh_blobs::{net_protocol::Blobs, ticket::BlobTicket};
 use iroh_gossip::net::GossipSender;
 use tokio::io::{self, AsyncBufReadExt};
-use tokio::{sync::RwLock, time};
+use tokio::time;
 use tracing::{error, info, warn}; // Level, instrument
 
 /// Read input from stdin
-pub async fn input_loop(
-    node: (NodeId, String),
-    sender: GossipSender,
-    members: std::sync::Arc<RwLock<HashMap<NodeId, String>>>,
-    relay_map: RelayMap,
-) -> Result<()> {
-    let (node_id, name) = node;
+pub async fn input_loop(mem_db: MemDB, sender: GossipSender, relay_map: RelayMap) -> Result<()> {
     let eol = &['\r', '\n'][..];
     // println!("module_path = {}", module_path!());
 
@@ -79,10 +73,10 @@ pub async fn input_loop(
                 time::sleep(time::Duration::from_millis(100)).await;
                 break;
             }
-            COMMAND_ME => println!("node_id={node_id}, name={name:?}"),
+            COMMAND_ME => println!("node_id={}, name={:?}", mem_db.node_id, mem_db.name),
             COMMAND_MEMBERS => {
-                let members = members.read().await;
-                println!("- {node_id}: {name:?}");
+                let members = mem_db.members.read().await;
+                println!("- {}: {:?}", mem_db.node_id, mem_db.name);
 
                 let mut members: Vec<_> = members.iter().collect();
                 members.sort_by(|a, b| a.1.cmp(b.1));
@@ -265,8 +259,8 @@ pub async fn input_loop(
                 let msg = Msg::Message { text: text };
 
                 match sender.broadcast(msg.to_vec().into()).await {
-                    Ok(_) => info!(">>> Message: you({name:?})"),
-                    Err(e) => error!(">>> Message: you({name:?}), {e:?}"),
+                    Ok(_) => info!(">>> Message: you({:?})", mem_db.name),
+                    Err(e) => error!(">>> Message: you({:?}), {e:?}", mem_db.name),
                 }
             }
         }

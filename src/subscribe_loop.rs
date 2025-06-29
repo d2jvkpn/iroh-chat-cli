@@ -1,26 +1,23 @@
-use std::collections::HashMap;
-
-use crate::structs::{EOF_BLOCK, Message, Msg};
+use crate::structs::{EOF_BLOCK, MemDB, Message, Msg};
 use crate::utils::{content_to_file, local_now};
 
 use anyhow::Result;
 use futures_lite::StreamExt;
-use iroh::{NodeId, PublicKey};
+use iroh::PublicKey;
 use iroh_gossip::net::{self, Event, GossipEvent, GossipReceiver, GossipSender};
-use tokio::sync::RwLock;
 use tracing::{error, info, warn}; // Level, instrument
 
 pub async fn subscribe_loop(
-    node: (NodeId, String),
+    mem_db: MemDB,
     sender: GossipSender,
     mut receiver: GossipReceiver,
-    members: std::sync::Arc<RwLock<HashMap<NodeId, String>>>,
 ) -> Result<()> {
-    let about_me = Message::new(Msg::AboutMe { name: node.1.clone(), at: local_now() });
+    let about_me = Message::new(Msg::AboutMe { name: mem_db.name.clone(), at: local_now() });
 
     let get_entry = async |from: &PublicKey| {
         // if it's a `Message` message, get the name from the map and print the message
-        members
+        mem_db
+            .members
             .read()
             .await
             .get(from)
@@ -29,7 +26,8 @@ pub async fn subscribe_loop(
     };
 
     let remove_entry = async |from: &PublicKey| {
-        members
+        mem_db
+            .members
             .write()
             .await
             .remove_entry(from)
@@ -76,7 +74,7 @@ pub async fn subscribe_loop(
                 warn!("<-- Bye: {entry}, {at}");
             }
             Msg::AboutMe { name: peer_name, at } => {
-                let mut members = members.write().await;
+                let mut members = mem_db.members.write().await;
                 // if it's an `AboutMe` message add and entry into the map and print the name
                 if !members.contains_key(&from) {
                     members.insert(from, peer_name.clone());

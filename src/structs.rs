@@ -1,11 +1,12 @@
-use std::{fmt, str::FromStr};
+use std::{collections::HashMap, fmt, str::FromStr};
 
 use anyhow::Result;
 // use base64::{Engine, engine::general_purpose};
-use iroh::NodeAddr; // NodeId
+use iroh::{NodeAddr, NodeId};
 use iroh_blobs::ticket::BlobTicket;
 use iroh_gossip::proto::TopicId;
 use serde::{Deserialize, Serialize};
+use tokio::sync::RwLock;
 
 pub const COMMAND_QUIT: &str = "::quit";
 pub const COMMAND_ME: &str = "::me";
@@ -102,5 +103,18 @@ impl FromStr for TopicTicket {
         // let bytes = general_purpose::STANDARD.decode(s.as_bytes())?;
         let bytes = data_encoding::BASE32_NOPAD.decode(s.to_ascii_uppercase().as_bytes())?;
         Self::from_bytes(&bytes)
+    }
+}
+
+#[derive(Clone)]
+pub struct MemDB {
+    pub node_id: NodeId,
+    pub name: String,
+    pub members: std::sync::Arc<RwLock<HashMap<NodeId, String>>>,
+}
+
+impl MemDB {
+    pub fn new(node_id: NodeId, name: String) -> Self {
+        Self { node_id, name, members: std::sync::Arc::new(RwLock::new(HashMap::new())) }
     }
 }
