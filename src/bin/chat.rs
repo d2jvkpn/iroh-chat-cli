@@ -41,10 +41,8 @@ struct Command {
     #[arg(short = 'r', long, action=ArgAction::Append)]
     relay_url: Vec<String>,
 
-    /*
-    #[clap(short, long)] // default_value = "configs/local.yaml"
-    config: Option<String>,
-    */
+    //#[clap(short, long, default_value = "configs/local.yaml")]
+    //config: Option<String>,
     /// run in debug mode
     #[arg(long)]
     verbose: bool,
@@ -120,15 +118,8 @@ async fn main() -> Result<()> {
         }
     };
 
-    /*
-    let relay_map: RelayMap = args
-        .relay_url
-        .and_then(|v| Some(v.parse::<RelayUrl>().ok()?))
-        .map(RelayNode::from)
-        .map(RelayMap::from)
-        .unwrap_or_else(|| RelayMap::empty());
-    */
-
+    //let relay_url = endpoint.home_relay().initialized().await.unwrap();
+    //println!("==> relay_url: {:?}", relay_url);
     let relay_map = if args.relay_url.is_empty() {
         iroh::defaults::prod::default_relay_map()
     } else if args.relay_url.len() == 1 && args.relay_url[0] == "none" {
@@ -144,17 +135,6 @@ async fn main() -> Result<()> {
         RelayMap::from_iter(urls)
     };
 
-    /*
-    let secret_key: SecretKey = match args.config {
-        Some(v) => {
-            let yaml = utils::load_yaml(&v).unwrap();
-            let val = utils::config_get(&yaml, "iroh.secret_key").unwrap();
-            let val = serde_yaml::to_string(val)?;
-            SecretKey::from_str(&val.trim())?
-        }
-        None => utils::iroh_secret_key(),
-    };
-    */
     let secret_key: SecretKey = utils::iroh_secret_key();
 
     let endpoint = Endpoint::builder()
@@ -163,9 +143,6 @@ async fn main() -> Result<()> {
         .discovery_n0()
         .bind()
         .await?;
-
-    //let relay_url = endpoint.home_relay().initialized().await.unwrap();
-    //println!("==> relay_url: {:?}", relay_url);
 
     let mem_db = MemDB::new(endpoint.node_id(), name.clone());
     // Get our address information, includes our `NodeId`, our `RelayUrl`, and any direct addresses.
@@ -230,8 +207,6 @@ async fn main() -> Result<()> {
     sender.broadcast(about_me.to_vec(mem_db.node_id()).into()).await?;
 
     tokio::spawn(subscribe_loop(mem_db.clone(), sender.clone(), receiver));
-    // broadcast each line we type
-    info!("==> Type a message and hit enter to broadcast...");
 
     if let Err(e) = input_loop(mem_db.clone(), sender.clone(), relay_map).await {
         error!("input_loop: {e:?}");

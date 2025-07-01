@@ -17,6 +17,9 @@ use tracing::{error, info, warn}; // Level, instrument
 
 /// Read input from stdin
 pub async fn input_loop(mem_db: MemDB, sender: GossipSender, relay_map: RelayMap) -> Result<()> {
+    // broadcast each line we type
+    info!("==> Type a message and hit enter to broadcast...");
+
     let (node_id, name) = (mem_db.node_id(), mem_db.name());
     let eol = &['\r', '\n'][..];
     // println!("module_path = {}", module_path!());
@@ -52,7 +55,7 @@ pub async fn input_loop(mem_db: MemDB, sender: GossipSender, relay_map: RelayMap
 
         let text = buffer.trim_end().to_string();
         buffer.clear(); // clear the buffer after we've sent the content
-     */
+    */
 
     let mut reader = io::BufReader::new(io::stdin()).lines();
     let mut buffer = String::new();
@@ -99,7 +102,6 @@ pub async fn input_loop(mem_db: MemDB, sender: GossipSender, relay_map: RelayMap
                 };
 
                 // info!("{command} started: {args:?}");
-
                 let command = command.to_string();
 
                 tokio::task::spawn_blocking(move || {
@@ -132,12 +134,6 @@ pub async fn input_loop(mem_db: MemDB, sender: GossipSender, relay_map: RelayMap
                 });
             }
             COMMAND_SEND_FILE => {
-                // let (filepath, _) = split_first_space(&line[COMMAND_SEND.len()..], true);
-                //if filepath.is_empty() {
-                //    warn!("no input file\n{EOF_BLOCK}");
-                //    continue;
-                //};
-
                 let filepath = match shell_words::split(&text.replace("\n", " ")) {
                     Ok(args) if args.len() == 2 => args[1].clone(),
                     _ => {
@@ -168,12 +164,6 @@ pub async fn input_loop(mem_db: MemDB, sender: GossipSender, relay_map: RelayMap
                 }
             }
             COMMAND_SHARE_FILE => {
-                //let (filename, _) = split_first_space(&line[COMMAND_SHARE.len()..], true);
-                //if filename.is_empty() {
-                //    warn!("no input file\n{EOF_BLOCK}");
-                //    continue;
-                //};
-
                 let filepath = match shell_words::split(&text.replace("\n", " ")) {
                     Ok(args) if args.len() == 2 => args[1].clone(),
                     _ => {
@@ -215,16 +205,6 @@ pub async fn input_loop(mem_db: MemDB, sender: GossipSender, relay_map: RelayMap
                 });
             }
             COMMAND_RECEIVE_FILE => {
-                //let (ticket, filename) = split_first_space(&line[COMMAND_RECEIVE.len()..], true);
-
-                //let filename = match filename {
-                //    Some(v) => v,
-                //    None => {
-                //        warn!("no filename\n{EOF_BLOCK}");
-                //        continue;
-                //    }
-                //};
-
                 let (ticket, filepath) = match shell_words::split(&text.replace("\n", " ")) {
                     Ok(args) if args.len() == 3 => (args[1].clone(), args[2].clone()),
                     _ => {
