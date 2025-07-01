@@ -1,10 +1,10 @@
 use std::{fmt::Debug, path, str::FromStr};
 
 use iroh_chat_cli::structs::{MemDB, Msg, TopicTicket};
-use iroh_chat_cli::utils::{self, build_info, local_now};
+use iroh_chat_cli::utils::{self, build_info};
 use iroh_chat_cli::{input_loop, subscribe_loop};
 
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use clap::{ArgAction, Args, Parser};
 use iroh::{Endpoint, NodeAddr, RelayMap, RelayMode, RelayUrl, SecretKey, protocol::Router};
 /* RelayUrlParseError, RelayNode */
@@ -41,8 +41,9 @@ struct Command {
     #[arg(short = 'r', long, action=ArgAction::Append)]
     relay_url: Vec<String>,
 
-    //#[clap(short, long, default_value = "configs/local.yaml")]
-    //config: Option<String>,
+    #[clap(short, long)] // default_value = "configs/local.yaml"
+    config: Option<String>,
+
     /// run in debug mode
     #[arg(long)]
     verbose: bool,
@@ -135,16 +136,27 @@ async fn main() -> Result<()> {
         RelayMap::from_iter(urls)
     };
 
-    let secret_key: SecretKey = utils::iroh_secret_key();
+    let secret_key: SecretKey = match args.config {
+        Some(v) => {
+            let yaml = utils::load_yaml(&v)?;
+
+            let val = utils::config_get(&yaml, "iroh.secret_key")
+                .ok_or(anyhow!("can't get iroh.secret_key from config"))?;
+
+            let val = serde_yaml::to_string(val)?;
+            SecretKey::from_str(&val.trim())?
+        }
+        None => utils::iroh_secret_key(),
+    };
 
     let endpoint = Endpoint::builder()
         .relay_mode(RelayMode::Custom(relay_map.clone()))
-        .secret_key(secret_key)
+        .secret_key(secret_key.clone())
         .discovery_n0()
         .bind()
         .await?;
 
-    let mem_db = MemDB::new(endpoint.node_id(), name.clone());
+    let mem_db = MemDB::new(secret_key, endpoint.node_id(), name.clone());
     // Get our address information, includes our `NodeId`, our `RelayUrl`, and any direct addresses.
     let node_addr = endpoint.node_addr().await?;
 
@@ -170,8 +182,7 @@ async fn main() -> Result<()> {
     // dbg!(&ticket);
 
     // println!("--> node: {node_addr:?}\n    ticket: {ticket}");
-    println!("--> node_id: {}", mem_db.node_id());
-    println!("    name: {}", mem_db.name());
+    println!("--> node: {:?}", mem_db.node());
     println!("    relay_url: {:?}", node_addr.relay_url());
     println!("    direct_addresses: {:?}", node_addr.direct_addresses().collect::<Vec<_>>());
     if let Some(v) = write_ticket {
@@ -203,8 +214,8 @@ async fn main() -> Result<()> {
     let (sender, receiver) = gossip.subscribe_and_join(topic, node_ids).await?.split();
     info!("connected!");
 
-    let about_me = Msg::AboutMe { name: name.clone(), at: local_now() };
-    sender.broadcast(about_me.to_vec(mem_db.node_id()).into()).await?;
+    let about_me = Msg::AboutMe { name: name.clone() };
+    sender.broadcast(mem_db.sign_msg(about_me).into()).await?;
 
     tokio::spawn(subscribe_loop(mem_db.clone(), sender.clone(), receiver));
 

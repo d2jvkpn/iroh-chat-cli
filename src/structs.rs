@@ -1,8 +1,12 @@
 use std::{collections::HashMap, fmt, str::FromStr};
 
-use anyhow::Result;
+// use crate::utils::local_now;
+
+use anyhow::{Result, anyhow};
+use ed25519::Signature;
 // use base64::{Engine, engine::general_purpose};
-use iroh::{NodeAddr, NodeId};
+use bytes::Bytes;
+use iroh::{NodeAddr, NodeId, SecretKey};
 use iroh_blobs::ticket::BlobTicket;
 use iroh_gossip::proto::TopicId;
 use serde::{Deserialize, Serialize};
@@ -20,28 +24,12 @@ pub const COMMAND_RECEIVE_FILE: &str = "::receive_file";
 pub const MAX_FILESIZE: u64 = 8 * 1024 * 1024;
 pub const EOF_BLOCK: &str = "----------------------------------------------------------------";
 
-#[derive(Debug, Serialize, Deserialize)]
-pub enum Msg {
-    AboutMe { name: String, at: String },
-    Bye { at: String },
-    Message { text: String },
-    SendFile { filename: String, content: Vec<u8> },
-    ShareFile { filename: String, size: u64, ticket: BlobTicket },
-}
-
-impl Msg {
-    pub fn to_vec(self, from: NodeId) -> Vec<u8> {
-        serde_json::to_vec(&Message { from, nonce: rand::random(), msg: self })
-            .expect("serde_json::to_vec is infallible")
-    }
-}
-
 // add the message code to the bottom
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Message {
-    nonce: [u8; 16],
     pub from: NodeId,
-    // TODO: pub signature: Signature,
+    nonce: [u8; 16],
+    pub at: i64,
     pub msg: Msg,
 }
 
@@ -51,13 +39,41 @@ impl Message {
     }
 
     pub fn new(node_id: NodeId, msg: Msg) -> Self {
-        Self { from: node_id, nonce: rand::random(), msg }
+        Self {
+            from: node_id,
+            nonce: rand::random(),
+            at: chrono::Utc::now().timestamp_millis(),
+            msg,
+        }
     }
 
     pub fn to_bytes(&self) -> Vec<u8> {
         serde_json::to_vec(self).expect("serde_json::to_vec is infallible")
     }
 }
+
+#[derive(Debug, Serialize, Deserialize)]
+pub enum Msg {
+    AboutMe { name: String },
+    Bye,
+    Message { text: String },
+    SendFile { filename: String, content: Vec<u8> },
+    ShareFile { filename: String, size: u64, ticket: BlobTicket },
+}
+
+/*
+impl Msg {
+    pub fn to_vec(self, from: NodeId) -> Vec<u8> {
+        serde_json::to_vec(&Message {
+            nonce: rand::random(),
+            at: chrono::Utc::now().timestamp_millis(),
+            from,
+            msg: self,
+        })
+        .expect("serde_json::to_vec is infallible")
+    }
+}
+*/
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TopicTicket {
@@ -108,24 +124,74 @@ impl FromStr for TopicTicket {
     }
 }
 
+pub fn parse_raw_message(bts: &Bytes) -> Result<Message> {
+    if bts.len() <= 64 {
+        return Err(anyhow!("invalid length: {}", bts.len()));
+    }
+
+    let signature =
+        Signature::from_slice(&bts[..64]).map_err(|e| anyhow!("parse signature: {e:?}"))?;
+
+    let message = Message::from_bytes(&bts[64..]).map_err(|e| anyhow!("parse message: {e:?}"))?;
+
+    message.from.verify(&bts[64..], &signature).map_err(|e| anyhow!("verify signature: {e:?}"))?;
+
+    // TODO: nonce, at
+
+    Ok(message)
+}
+
 #[derive(Clone)]
 pub struct MemDB {
+    secret_key: SecretKey,
     node_id: NodeId,
     name: String,
     pub members: std::sync::Arc<RwLock<HashMap<NodeId, String>>>,
 }
 
 impl MemDB {
-    pub fn new(node_id: NodeId, name: String) -> Self {
-        Self { node_id, name, members: std::sync::Arc::new(RwLock::new(HashMap::new())) }
+    pub fn new(secret_key: SecretKey, node_id: NodeId, name: String) -> Self {
+        Self {
+            secret_key,
+            node_id,
+            name,
+            members: std::sync::Arc::new(RwLock::new(HashMap::new())),
+        }
     }
 
-    pub fn node_id(&self) -> NodeId {
-        self.node_id
+    pub fn node(&self) -> (NodeId, String) {
+        (self.node_id, self.name.clone())
     }
 
-    pub fn name(&self) -> String {
-        self.name.clone()
+    pub fn sign_msg(&self, msg: Msg) -> Bytes {
+        let bts = serde_json::to_vec(&Message {
+            from: self.node_id,
+            nonce: rand::random(),
+            at: chrono::Utc::now().timestamp_millis(),
+            msg,
+        })
+        .expect("serde_json::to_vec is infallible");
+
+        let signature = self.secret_key.sign(&bts);
+
+        let mut buf = Vec::with_capacity(64 + bts.len());
+
+        buf.extend(&signature.to_bytes());
+        buf.extend(bts);
+
+        buf.into()
+    }
+
+    pub fn sign_message(&self, message: &Message) -> Bytes {
+        let bts = serde_json::to_vec(message).expect("serde_json::to_vec is infallible");
+        let signature = self.secret_key.sign(&bts);
+
+        let mut buf = Vec::with_capacity(64 + bts.len());
+
+        buf.extend(&signature.to_bytes());
+        buf.extend(bts);
+
+        buf.into()
     }
 }
 

@@ -1,5 +1,7 @@
 use crate::structs::{EOF_BLOCK, MemDB, Message, Msg};
-use crate::utils::{content_to_file, local_now};
+use crate::utils::content_to_file;
+
+use crate::structs::parse_raw_message;
 
 use anyhow::Result;
 use futures_lite::StreamExt;
@@ -12,9 +14,8 @@ pub async fn subscribe_loop(
     sender: GossipSender,
     mut receiver: GossipReceiver,
 ) -> Result<()> {
-    let (node_id, _name) = (mem_db.node_id(), mem_db.name());
-
-    let about_me = Message::new(node_id, Msg::AboutMe { name: mem_db.name(), at: local_now() });
+    let (node_id, name) = mem_db.node();
+    let about_me = Message::new(node_id, Msg::AboutMe { name: name.clone() });
 
     let get_entry = async |from: &PublicKey| {
         // if it's a `Message` message, get the name from the map and print the message
@@ -61,8 +62,9 @@ pub async fn subscribe_loop(
 
         // let from = msg.delivered_from;
         // dbg!(&from);
-        let (from, msg) = match Message::from_bytes(&message.content) {
-            Ok(v) => (v.from, v.msg), // NodeId, Msg
+        // let (from, msg, at) = match Message::from_bytes(&message.content[64..]) {
+        let (from, msg, at) = match parse_raw_message(&message.content) {
+            Ok(v) => (v.from, v.msg, v.at), // NodeId, Msg
             Err(e) => {
                 error!(
                     "Unknown message: delivered_from={}, error={e:?}\n{EOF_BLOCK}",
@@ -74,11 +76,11 @@ pub async fn subscribe_loop(
 
         // deserialize the message and match on the message type:
         match msg {
-            Msg::Bye { at } => {
+            Msg::Bye => {
                 let entry = remove_entry(&from).await;
                 warn!("<-- Bye: {entry}, {at}");
             }
-            Msg::AboutMe { name: peer_name, at } => {
+            Msg::AboutMe { name: ref peer_name } => {
                 let mut members = mem_db.members.write().await;
                 // if it's an `AboutMe` message add and entry into the map and print the name
                 if !members.contains_key(&from) {
@@ -87,7 +89,7 @@ pub async fn subscribe_loop(
                     info!("<-- NewPeer: {from}\nname={peer_name:?}, at={at}");
                 }
 
-                if let Err(e) = sender.broadcast(about_me.to_bytes().into()).await {
+                if let Err(e) = sender.broadcast(mem_db.sign_message(&about_me)).await {
                     error!("AboutMe broadcast error: {e:?}");
                 }
             }

@@ -5,7 +5,7 @@ use crate::structs::MAX_FILESIZE;
 use anyhow::{Result, anyhow};
 use iroh::SecretKey;
 //use rand::RngCore;
-use chrono::{Local, SecondsFormat, Utc};
+use chrono::{DateTime, Local, SecondsFormat, Utc};
 use rand::prelude::*;
 use serde_yaml::Value;
 use tokio::fs;
@@ -68,6 +68,15 @@ pub fn local_now() -> String {
     return now.to_rfc3339_opts(SecondsFormat::Millis, true);
 }
 
+pub fn local_from_millis(millis: i64) -> Result<DateTime<Local>> {
+    let secs: i64 = millis / 1_000;
+    let nanos: u32 = (millis % 1_000) as u32 * 1_000_000;
+
+    DateTime::from_timestamp(secs, nanos)
+        .map(|v| v.with_timezone(&Local))
+        .ok_or_else(|| anyhow!("invalid timestamp"))
+}
+
 pub fn iroh_secret_key() -> SecretKey {
     // let secret_key = SecretKey::generate(rand::rngs::ThreadRng); // !!! rand 0.8
     // let endpoint =
@@ -90,6 +99,7 @@ pub fn split_first_space(mut s: &str, trim: bool) -> (&str, Option<&str>) {
     if trim {
         s = s.trim();
     }
+
     match s.split_once(' ') {
         Some((first, rest)) => (first, Some(rest)),
         None => (s, None), // when no space in s
@@ -205,5 +215,18 @@ mod tests {
         let yaml = load_yaml("configs/local.yaml").unwrap();
         let secret_key = config_get(&yaml, "iroh.secret_key").and_then(|v| v.as_str()).unwrap();
         dbg!(&secret_key);
+    }
+
+    #[test]
+    fn sign() {
+        let secret_key = iroh_secret_key();
+        let pub_key = secret_key.public();
+
+        let bts = b"Hello, world";
+        let signature = secret_key.sign(bts);
+        let result = pub_key.verify(bts, &signature);
+        assert!(result.is_ok());
+
+        println!("--> signature: {signature}");
     }
 }

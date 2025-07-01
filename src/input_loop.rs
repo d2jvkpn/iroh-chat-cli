@@ -5,7 +5,7 @@ use crate::structs::{
     COMMAND_SEND_FILE, COMMAND_SHARE_FILE, EOF_BLOCK, MAX_FILESIZE, MemDB, Msg,
 };
 use crate::transfer::{receive_file, share_file};
-use crate::utils::{local_now, read_file_content, split_first_space};
+use crate::utils::{read_file_content, split_first_space};
 
 use anyhow::Result;
 use iroh::{Endpoint, RelayMap, RelayMode, protocol::Router};
@@ -20,7 +20,7 @@ pub async fn input_loop(mem_db: MemDB, sender: GossipSender, relay_map: RelayMap
     // broadcast each line we type
     info!("==> Type a message and hit enter to broadcast...");
 
-    let (node_id, name) = (mem_db.node_id(), mem_db.name());
+    let (node_id, name) = mem_db.node();
     let eol = &['\r', '\n'][..];
     // println!("module_path = {}", module_path!());
 
@@ -75,9 +75,9 @@ pub async fn input_loop(mem_db: MemDB, sender: GossipSender, relay_map: RelayMap
 
         match command {
             COMMAND_QUIT => {
-                let msg = Msg::Bye { at: local_now() };
+                let msg = Msg::Bye {};
                 // broadcast the encoded message
-                sender.broadcast(msg.to_vec(node_id).into()).await?;
+                sender.broadcast(mem_db.sign_msg(msg)).await?;
                 time::sleep(time::Duration::from_millis(100)).await;
                 break;
             }
@@ -158,7 +158,7 @@ pub async fn input_loop(mem_db: MemDB, sender: GossipSender, relay_map: RelayMap
                     }
                 };
 
-                match sender.broadcast(msg.to_vec(node_id).into()).await {
+                match sender.broadcast(mem_db.sign_msg(msg)).await {
                     Ok(_) => info!("{command} broadcast ok: {filepath}"),
                     Err(e) => error!("{command} broadcast error: {filepath}, {e:?}"),
                 }
@@ -184,6 +184,7 @@ pub async fn input_loop(mem_db: MemDB, sender: GossipSender, relay_map: RelayMap
                 let command = command.to_string();
                 let blobs_client = blobs_client.clone();
                 let sender = sender.clone();
+                let mem_db = mem_db.clone();
 
                 tokio::spawn(async move {
                     let (size, ticket) =
@@ -198,7 +199,7 @@ pub async fn input_loop(mem_db: MemDB, sender: GossipSender, relay_map: RelayMap
                     let msg =
                         Msg::ShareFile { filename: basename.clone(), size, ticket: ticket.clone() };
 
-                    match sender.broadcast(msg.to_vec(node_id).into()).await {
+                    match sender.broadcast(mem_db.sign_msg(msg)).await {
                         Ok(_) => info!("{command} broadcast ok:\n{ticket} {basename}\n{EOF_BLOCK}"),
                         Err(e) => error!("{command} broadcast error: {e:?}\n{EOF_BLOCK}"),
                     }
@@ -243,9 +244,9 @@ pub async fn input_loop(mem_db: MemDB, sender: GossipSender, relay_map: RelayMap
             _ => {
                 let msg = Msg::Message { text: text };
 
-                match sender.broadcast(msg.to_vec(node_id).into()).await {
-                    Ok(_) => info!(">>> Message: you({:?})", mem_db.name()),
-                    Err(e) => error!(">>> Message: you({:?}), {e:?}", mem_db.name()),
+                match sender.broadcast(mem_db.sign_msg(msg)).await {
+                    Ok(_) => info!(">>> Message: you({name:?})"),
+                    Err(e) => error!(">>> Message: you({name:?}), {e:?}"),
                 }
             }
         }
