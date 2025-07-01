@@ -84,12 +84,12 @@ pub async fn input_loop(mem_db: MemDB, sender: GossipSender, relay_map: RelayMap
             COMMAND_ME => println!("node_id={node_id}, name={name:?}"),
             COMMAND_MEMBERS => {
                 let members = mem_db.members.read().await;
-                println!("- {node_id}: {name:?}");
+                println!("- node_id: {node_id}\n  name: {name:?}\n  tags: [self]");
 
                 let mut members: Vec<_> = members.iter().collect();
                 members.sort_by(|a, b| a.1.cmp(b.1));
                 for (node_id, name) in members {
-                    println!("- {node_id}: {name:?}")
+                    println!("- node_id: {node_id}\n  name: {name:?}");
                 }
             }
             COMMAND_RUN => {
