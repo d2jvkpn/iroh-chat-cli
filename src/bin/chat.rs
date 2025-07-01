@@ -1,7 +1,7 @@
 use std::{fmt::Debug, path, str::FromStr};
 
 use iroh_chat_cli::structs::{MemDB, Msg, TopicTicket};
-use iroh_chat_cli::utils::{self, local_now};
+use iroh_chat_cli::utils::{self, build_info, local_now};
 use iroh_chat_cli::{input_loop, subscribe_loop};
 
 use anyhow::Result;
@@ -14,45 +14,6 @@ use tokio::{fs, io::AsyncWriteExt};
 use tracing::{error, info, warn}; // Level, instrument
 use tracing_subscriber::EnvFilter;
 
-const _BUILD_INFO: &str = concat!(
-    "\nBuildInfo:",
-    "\n  build_time: ",
-    env!("BUILD_TIME"),
-    "\n  version: ",
-    env!("CARGO_PKG_VERSION"),
-    "\n  git_registry: ",
-    env!("GIT_REGISTRY"),
-    "\n  git_branch: ",
-    env!("GIT_BRANCH"),
-    "\n  git_status: ",
-    env!("GIT_STATUS"),
-    "\n  git_commit_hash: ",
-    env!("GIT_COMMIT_HASH"),
-    "\n  git_commit_time: ",
-    env!("GIT_COMMIT_TIME"),
-    "\n",
-);
-
-pub fn build_info() -> String {
-    format!(
-        r#"BuildInfo:
-  build_time     : {}
-  version        : {}
-  git_registry   : {}
-  git_branch     : {}
-  git_status     : {}
-  git_commit_hash: {}
-  git_commit_time: {}"#,
-        env!("BUILD_TIME"),
-        env!("CARGO_PKG_VERSION"),
-        env!("GIT_REGISTRY"),
-        env!("GIT_BRANCH"),
-        env!("GIT_STATUS"),
-        env!("GIT_COMMIT_HASH"),
-        env!("GIT_COMMIT_TIME"),
-    )
-}
-
 /// Chat over iroh-gossip
 ///
 /// This broadcasts unsigned messages over iroh-gossip.
@@ -62,8 +23,10 @@ pub fn build_info() -> String {
 /// By default, we use the default n0 discovery services to dial by `NodeId`.
 #[derive(Parser, Debug)]
 #[command(
-  name = "iroh-gossip-cli", version = "1.0", about = "p2p chat inrust from scratch",
-  after_help = build_info(),
+    name = "iroh-chat-cli",
+    version = "1.0",
+    about = "p2p chat inrust from scratch",
+    after_help = build_info(),
 )]
 struct Command {
     /*
@@ -230,8 +193,8 @@ async fn main() -> Result<()> {
     // dbg!(&ticket);
 
     // println!("--> node: {node_addr:?}\n    ticket: {ticket}");
-    println!("--> node_id: {}", mem_db.node_id);
-    println!("    name: {}", mem_db.name);
+    println!("--> node_id: {}", mem_db.node_id());
+    println!("    name: {}", mem_db.name());
     println!("    relay_url: {:?}", node_addr.relay_url());
     println!("    direct_addresses: {:?}", node_addr.direct_addresses().collect::<Vec<_>>());
     if let Some(v) = write_ticket {
@@ -264,7 +227,7 @@ async fn main() -> Result<()> {
     info!("connected!");
 
     let about_me = Msg::AboutMe { name: name.clone(), at: local_now() };
-    sender.broadcast(about_me.to_vec().into()).await?;
+    sender.broadcast(about_me.to_vec(mem_db.node_id()).into()).await?;
 
     tokio::spawn(subscribe_loop(mem_db.clone(), sender.clone(), receiver));
     // broadcast each line we type

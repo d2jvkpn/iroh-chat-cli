@@ -12,7 +12,9 @@ pub async fn subscribe_loop(
     sender: GossipSender,
     mut receiver: GossipReceiver,
 ) -> Result<()> {
-    let about_me = Message::new(Msg::AboutMe { name: mem_db.name.clone(), at: local_now() });
+    let (node_id, _name) = (mem_db.node_id(), mem_db.name());
+
+    let about_me = Message::new(node_id, Msg::AboutMe { name: mem_db.name(), at: local_now() });
 
     let get_entry = async |from: &PublicKey| {
         // if it's a `Message` message, get the name from the map and print the message
@@ -36,7 +38,7 @@ pub async fn subscribe_loop(
     };
 
     while let Some(event) = receiver.try_next().await? {
-        let msg: net::Message = match event {
+        let message: net::Message = match event {
             Event::Lagged => {
                 warn!("=== Lagged");
                 continue;
@@ -57,12 +59,15 @@ pub async fn subscribe_loop(
             Event::Gossip(GossipEvent::Received(v)) => v,
         };
 
-        let from = msg.delivered_from;
+        // let from = msg.delivered_from;
         // dbg!(&from);
-        let msg: Msg = match Message::from_bytes(&msg.content) {
-            Ok(v) => v.msg,
+        let (from, msg) = match Message::from_bytes(&message.content) {
+            Ok(v) => (v.from, v.msg), // NodeId, Msg
             Err(e) => {
-                error!("Unknown message: {}, {e:?}\n{EOF_BLOCK}", get_entry(&from).await);
+                error!(
+                    "Unknown message: delivered_from={}, error={e:?}\n{EOF_BLOCK}",
+                    get_entry(&message.delivered_from).await
+                );
                 continue;
             }
         };

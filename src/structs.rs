@@ -30,8 +30,8 @@ pub enum Msg {
 }
 
 impl Msg {
-    pub fn to_vec(self) -> Vec<u8> {
-        serde_json::to_vec(&Message { msg: self, nonce: rand::random() })
+    pub fn to_vec(self, from: NodeId) -> Vec<u8> {
+        serde_json::to_vec(&Message { from, nonce: rand::random(), msg: self })
             .expect("serde_json::to_vec is infallible")
     }
 }
@@ -39,8 +39,10 @@ impl Msg {
 // add the message code to the bottom
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Message {
-    pub msg: Msg,
     nonce: [u8; 16],
+    pub from: NodeId,
+    // TODO: pub signature: Signature,
+    pub msg: Msg,
 }
 
 impl Message {
@@ -48,8 +50,8 @@ impl Message {
         serde_json::from_slice(bytes).map_err(Into::into)
     }
 
-    pub fn new(msg: Msg) -> Self {
-        Self { msg, nonce: rand::random() }
+    pub fn new(node_id: NodeId, msg: Msg) -> Self {
+        Self { from: node_id, nonce: rand::random(), msg }
     }
 
     pub fn to_bytes(&self) -> Vec<u8> {
@@ -108,13 +110,27 @@ impl FromStr for TopicTicket {
 
 #[derive(Clone)]
 pub struct MemDB {
-    pub node_id: NodeId,
-    pub name: String,
+    node_id: NodeId,
+    name: String,
     pub members: std::sync::Arc<RwLock<HashMap<NodeId, String>>>,
 }
 
 impl MemDB {
     pub fn new(node_id: NodeId, name: String) -> Self {
         Self { node_id, name, members: std::sync::Arc::new(RwLock::new(HashMap::new())) }
+    }
+
+    pub fn node_id(&self) -> NodeId {
+        self.node_id
+    }
+
+    pub fn name(&self) -> String {
+        self.name.clone()
+    }
+}
+
+impl fmt::Display for MemDB {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "node_id={}, name={}", self.node_id, self.name)
     }
 }

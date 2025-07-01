@@ -14,6 +14,45 @@ use tracing_appender::{non_blocking::WorkerGuard, rolling}; // non_blocking::Non
 use tracing_subscriber::EnvFilter;
 use tracing_subscriber::fmt::{self, time::FormatTime}; // writer::MakeWriterExt
 
+const _BUILD_INFO: &str = concat!(
+    "\nBuildInfo:",
+    "\n  build_time: ",
+    env!("BUILD_TIME"),
+    "\n  version: ",
+    env!("CARGO_PKG_VERSION"),
+    "\n  git_registry: ",
+    env!("GIT_REGISTRY"),
+    "\n  git_branch: ",
+    env!("GIT_BRANCH"),
+    "\n  git_status: ",
+    env!("GIT_STATUS"),
+    "\n  git_commit_hash: ",
+    env!("GIT_COMMIT_HASH"),
+    "\n  git_commit_time: ",
+    env!("GIT_COMMIT_TIME"),
+    "\n",
+);
+
+pub fn build_info() -> String {
+    format!(
+        r#"BuildInfo:
+  build_time     : {}
+  version        : {}
+  git_registry   : {}
+  git_branch     : {}
+  git_status     : {}
+  git_commit_hash: {}
+  git_commit_time: {}"#,
+        env!("BUILD_TIME"),
+        env!("CARGO_PKG_VERSION"),
+        env!("GIT_REGISTRY"),
+        env!("GIT_BRANCH"),
+        env!("GIT_STATUS"),
+        env!("GIT_COMMIT_HASH"),
+        env!("GIT_COMMIT_TIME"),
+    )
+}
+
 pub fn load_yaml(filepath: &str) -> Result<Value> {
     let contents = std::fs::read_to_string(filepath)?;
     let yaml: Value = serde_yaml::from_str(&contents)?;
@@ -140,9 +179,13 @@ pub async fn content_to_file(content: Vec<u8>, filename: &str) -> Result<String>
         None => return Err(anyhow!("invalid filepath")),
     };
 
+    let home_dir = std::env::home_dir().ok_or(anyhow!("can't get home dir"))?;
+
     // let prefix = Local::now().format("%Y-%m-%d-%s").to_string();
-    let dir = path::Path::new("data")
-        .join("received_files")
+    let dir = path::Path::new(&home_dir) // path::Path::new("data").join("received_files")
+        .join("apps")
+        .join("data")
+        .join("iroh-chat-cli")
         .join(Utc::now().format("%Y-%m-%d-utc").to_string());
 
     let filepath = dir.join(filename);

@@ -17,17 +17,22 @@ use tracing::{error, info, warn}; // Level, instrument
 
 /// Read input from stdin
 pub async fn input_loop(mem_db: MemDB, sender: GossipSender, relay_map: RelayMap) -> Result<()> {
+    let (node_id, name) = (mem_db.node_id(), mem_db.name());
     let eol = &['\r', '\n'][..];
     // println!("module_path = {}", module_path!());
 
     let blobs_endpoint =
         Endpoint::builder().relay_mode(RelayMode::Custom(relay_map)).discovery_n0().bind().await?;
+
     let blobs_node_id = blobs_endpoint.node_id(); // router.endpoint().node_id();
+
     // We initialize the Blobs protocol in-memory
     let blobs = Blobs::memory().build(&blobs_endpoint);
+
     // Now we build a router that accepts blobs connections & routes them to the blobs protocol.
     let blobs_router =
         Router::builder(blobs_endpoint).accept(iroh_blobs::ALPN, blobs.clone()).spawn();
+
     // We use a blobs client to interact with the blobs protocol we're running locally:
     let blobs_client = blobs.client();
 
@@ -69,14 +74,14 @@ pub async fn input_loop(mem_db: MemDB, sender: GossipSender, relay_map: RelayMap
             COMMAND_QUIT => {
                 let msg = Msg::Bye { at: local_now() };
                 // broadcast the encoded message
-                sender.broadcast(msg.to_vec().into()).await?;
+                sender.broadcast(msg.to_vec(node_id).into()).await?;
                 time::sleep(time::Duration::from_millis(100)).await;
                 break;
             }
-            COMMAND_ME => println!("node_id={}, name={:?}", mem_db.node_id, mem_db.name),
+            COMMAND_ME => println!("node_id={node_id}, name={name:?}"),
             COMMAND_MEMBERS => {
                 let members = mem_db.members.read().await;
-                println!("- {}: {:?}", mem_db.node_id, mem_db.name);
+                println!("- {node_id}: {name:?}");
 
                 let mut members: Vec<_> = members.iter().collect();
                 members.sort_by(|a, b| a.1.cmp(b.1));
@@ -157,7 +162,7 @@ pub async fn input_loop(mem_db: MemDB, sender: GossipSender, relay_map: RelayMap
                     }
                 };
 
-                match sender.broadcast(msg.to_vec().into()).await {
+                match sender.broadcast(msg.to_vec(node_id).into()).await {
                     Ok(_) => info!("{command} broadcast ok: {filepath}"),
                     Err(e) => error!("{command} broadcast error: {filepath}, {e:?}"),
                 }
@@ -203,7 +208,7 @@ pub async fn input_loop(mem_db: MemDB, sender: GossipSender, relay_map: RelayMap
                     let msg =
                         Msg::ShareFile { filename: basename.clone(), size, ticket: ticket.clone() };
 
-                    match sender.broadcast(msg.to_vec().into()).await {
+                    match sender.broadcast(msg.to_vec(node_id).into()).await {
                         Ok(_) => info!("{command} broadcast ok:\n{ticket} {basename}\n{EOF_BLOCK}"),
                         Err(e) => error!("{command} broadcast error: {e:?}\n{EOF_BLOCK}"),
                     }
@@ -258,9 +263,9 @@ pub async fn input_loop(mem_db: MemDB, sender: GossipSender, relay_map: RelayMap
             _ => {
                 let msg = Msg::Message { text: text };
 
-                match sender.broadcast(msg.to_vec().into()).await {
-                    Ok(_) => info!(">>> Message: you({:?})", mem_db.name),
-                    Err(e) => error!(">>> Message: you({:?}), {e:?}", mem_db.name),
+                match sender.broadcast(msg.to_vec(node_id).into()).await {
+                    Ok(_) => info!(">>> Message: you({:?})", mem_db.name()),
+                    Err(e) => error!(">>> Message: you({:?}), {e:?}", mem_db.name()),
                 }
             }
         }
