@@ -28,15 +28,14 @@ pub const EOF_BLOCK: &str = "---------------------------------------------------
 // add the message code to the bottom
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Message {
-    pub from: NodeId,
     nonce: [u8; 16],
     pub at: i64,
     pub msg: Msg,
 }
 
 impl Message {
-    pub fn new(node_id: NodeId, msg: Msg) -> Self {
-        Self { from: node_id, nonce: rand::random(), at: Utc::now().timestamp_millis(), msg }
+    pub fn new(msg: Msg) -> Self {
+        Self { nonce: rand::random(), at: Utc::now().timestamp_millis(), msg }
     }
 
     /*
@@ -108,27 +107,6 @@ impl FromStr for TopicTicket {
     }
 }
 
-pub fn parse_raw_message(bts: &Bytes) -> Result<(Message, DateTime<Local>)> {
-    if bts.len() <= 64 {
-        return Err(anyhow!("invalid raw message length: {}", bts.len()));
-    }
-    let (signature, payload) = bts.split_at(64);
-
-    let signature =
-        Signature::from_slice(signature).map_err(|e| anyhow!("invalid signature: {e:?}"))?;
-
-    let message: Message =
-        serde_json::from_slice(payload).map_err(|e| anyhow!("parse message: {e:?}"))?;
-    // Message::from_json(&bts[64..]).map_err(|e| anyhow!("parse message: {e:?}"))?;
-
-    message.from.verify(payload, &signature).map_err(|e| anyhow!("verify signature: {e:?}"))?;
-
-    let at = local_from_millis(message.at)?;
-    // TODO: check at when it's not an AboutMe
-
-    Ok((message, at))
-}
-
 #[derive(Clone)]
 pub struct MemDB {
     secret_key: SecretKey,
@@ -155,8 +133,9 @@ impl MemDB {
         let bts = serde_json::to_vec(message).expect("serde_json::to_vec is infallible");
         let signature = self.secret_key.sign(&bts);
 
-        let mut buf = Vec::with_capacity(64 + bts.len());
+        let mut buf = Vec::with_capacity(96 + bts.len());
 
+        buf.extend(self.node_id.as_bytes());
         buf.extend(&signature.to_bytes());
         buf.extend(bts);
 
@@ -164,9 +143,34 @@ impl MemDB {
     }
 
     pub fn sign_msg(&self, msg: Msg) -> Bytes {
-        let message = Message::new(self.node_id, msg);
+        let message = Message::new(msg);
         self.sign_message(&message)
     }
+}
+
+pub fn parse_raw_message(bts: &Bytes) -> Result<(NodeId, DateTime<Local>, Message)> {
+    if bts.len() <= 96 {
+        return Err(anyhow!("invalid raw message length: {}", bts.len()));
+    }
+    let (from, bts) = bts.split_at(32);
+    let (signature, payload) = bts.split_at(64);
+
+    let from = NodeId::from_bytes(from.try_into().unwrap())
+        .map_err(|e| anyhow!("invalid node_id: {e:?}"))?;
+
+    let signature =
+        Signature::from_slice(signature).map_err(|e| anyhow!("invalid signature: {e:?}"))?;
+
+    from.verify(payload, &signature).map_err(|e| anyhow!("verify signature: {e:?}"))?;
+
+    let message: Message =
+        serde_json::from_slice(payload).map_err(|e| anyhow!("parse message: {e:?}"))?;
+    // Message::from_json(&bts[64..]).map_err(|e| anyhow!("parse message: {e:?}"))?;
+
+    let at = local_from_millis(message.at)?;
+    // TODO: check at when it's not an AboutMe
+
+    Ok((from, at, message))
 }
 
 impl fmt::Display for MemDB {

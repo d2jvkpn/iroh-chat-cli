@@ -14,8 +14,8 @@ pub async fn subscribe_loop(
     sender: GossipSender,
     mut receiver: GossipReceiver,
 ) -> Result<()> {
-    let (node_id, name) = mem_db.node();
-    let about_me = Message::new(node_id, Msg::AboutMe { name: name.clone() }); // fixed at
+    let (_node_id, name) = mem_db.node();
+    let about_me = Message::new(Msg::AboutMe { name: name.clone() }); // fixed .nonce and .at
 
     let get_entry = async |from: &PublicKey| {
         // if it's a `Message` message, get the name from the map and print the message
@@ -63,8 +63,8 @@ pub async fn subscribe_loop(
         // let from = msg.delivered_from;
         // dbg!(&from);
         // let (from, msg, at) = match Message::from_bytes(&message.content[64..]) {
-        let (from, msg, at) = match parse_raw_message(&message.content) {
-            Ok(v) => (v.0.from, v.0.msg, v.1),
+        let (from, at, msg) = match parse_raw_message(&message.content) {
+            Ok(v) => (v.0, v.1, v.2.msg),
             Err(e) => {
                 error!(
                     "Unknown message: delivered_from={}, error={e:?}\n{EOF_BLOCK}",

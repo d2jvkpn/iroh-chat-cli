@@ -229,4 +229,10 @@ mod tests {
 
         println!("--> signature: {signature}");
     }
+
+    #[test]
+    fn time() {
+        let at = Utc::now().timestamp_millis();
+        println!("{:?}, {:?}", at.to_be_bytes(), 0_i32.to_be_bytes());
+    }
 }
