@@ -29,13 +29,13 @@ pub const EOF_BLOCK: &str = "---------------------------------------------------
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Message {
     nonce: [u8; 16],
-    pub at: i64,
+    pub timestamp_ms: i64,
     pub msg: Msg,
 }
 
 impl Message {
     pub fn new(msg: Msg) -> Self {
-        Self { nonce: rand::random(), at: Utc::now().timestamp_millis(), msg }
+        Self { nonce: rand::random(), timestamp_ms: Utc::now().timestamp_millis(), msg }
     }
 
     /*
@@ -50,6 +50,7 @@ impl Message {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum Msg {
     AboutMe { name: String },
     Bye,
@@ -167,7 +168,7 @@ pub fn parse_raw_message(bts: &Bytes) -> Result<(NodeId, DateTime<Local>, Messag
         serde_json::from_slice(payload).map_err(|e| anyhow!("parse message: {e:?}"))?;
     // Message::from_json(&bts[64..]).map_err(|e| anyhow!("parse message: {e:?}"))?;
 
-    let at = local_from_millis(message.at)?;
+    let at = local_from_millis(message.timestamp_ms)?;
     // TODO: check at when it's not an AboutMe
 
     Ok((from, at, message))
