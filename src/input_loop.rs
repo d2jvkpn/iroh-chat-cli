@@ -121,16 +121,17 @@ pub async fn input_loop(mem_db: MemDB, sender: GossipSender, relay_map: RelayMap
                     if output.status.success() {
                         let stdout = String::from_utf8_lossy(&output.stdout);
                         info!(
-                            "{} success: {:?}\nelapsed: {:?}, stdout: \n{}\n{}",
-                            command, args, elapsed, stdout, EOF_BLOCK,
+                            "{} success: {:?}\nelapsed: {:?}, stdout: \n{}",
+                            command, args, elapsed, stdout,
                         );
                     } else {
                         let stderr = String::from_utf8_lossy(&output.stderr);
                         error!(
-                            "{} failed: {:?}\n\nelapsed: {:?}, stderr: \n{}\n{}",
-                            command, args, elapsed, stderr, EOF_BLOCK,
+                            "{} failed: {:?}\n\nelapsed: {:?}, stderr: \n{}",
+                            command, args, elapsed, stderr,
                         );
                     }
+                    println!("{EOF_BLOCK}");
                 });
             }
             COMMAND_SEND_FILE => {
@@ -200,9 +201,10 @@ pub async fn input_loop(mem_db: MemDB, sender: GossipSender, relay_map: RelayMap
                         Msg::ShareFile { filename: basename.clone(), size, ticket: ticket.clone() };
 
                     match sender.broadcast(mem_db.sign_msg(msg)).await {
-                        Ok(_) => info!("{command} broadcast ok:\n{ticket} {basename}\n{EOF_BLOCK}"),
-                        Err(e) => error!("{command} broadcast error: {e:?}\n{EOF_BLOCK}"),
+                        Ok(_) => info!("{command} broadcast ok:\n{ticket} {basename}"),
+                        Err(e) => error!("{command} broadcast error: {e:?}"),
                     }
+                    println!("{EOF_BLOCK}");
                 });
             }
             COMMAND_RECEIVE_FILE => {

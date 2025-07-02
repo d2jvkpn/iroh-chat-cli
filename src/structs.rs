@@ -110,20 +110,21 @@ impl FromStr for TopicTicket {
 
 pub fn parse_raw_message(bts: &Bytes) -> Result<(Message, DateTime<Local>)> {
     if bts.len() <= 64 {
-        return Err(anyhow!("invalid length: {}", bts.len()));
+        return Err(anyhow!("invalid raw message length: {}", bts.len()));
     }
+    let (signature, payload) = bts.split_at(64);
 
     let signature =
-        Signature::from_slice(&bts[..64]).map_err(|e| anyhow!("parse signature: {e:?}"))?;
+        Signature::from_slice(signature).map_err(|e| anyhow!("invalid signature: {e:?}"))?;
 
     let message: Message =
-        serde_json::from_slice(&bts[64..]).map_err(|e| anyhow!("parse message: {e:?}"))?;
+        serde_json::from_slice(payload).map_err(|e| anyhow!("parse message: {e:?}"))?;
     // Message::from_json(&bts[64..]).map_err(|e| anyhow!("parse message: {e:?}"))?;
 
-    message.from.verify(&bts[64..], &signature).map_err(|e| anyhow!("verify signature: {e:?}"))?;
+    message.from.verify(payload, &signature).map_err(|e| anyhow!("verify signature: {e:?}"))?;
 
     let at = local_from_millis(message.at)?;
-    // TODO: nonce, at
+    // TODO: check at when it's not an AboutMe
 
     Ok((message, at))
 }
