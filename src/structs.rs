@@ -1,8 +1,9 @@
 use std::{collections::HashMap, fmt, str::FromStr};
 
-// use crate::utils::local_now;
+use crate::utils::local_from_millis;
 
 use anyhow::{Result, anyhow};
+use chrono::{DateTime, Local, Utc};
 use ed25519::Signature;
 // use base64::{Engine, engine::general_purpose};
 use bytes::Bytes;
@@ -34,22 +35,19 @@ pub struct Message {
 }
 
 impl Message {
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
+    pub fn new(node_id: NodeId, msg: Msg) -> Self {
+        Self { from: node_id, nonce: rand::random(), at: Utc::now().timestamp_millis(), msg }
+    }
+
+    /*
+    pub fn from_json(bytes: &[u8]) -> Result<Self> {
         serde_json::from_slice(bytes).map_err(Into::into)
     }
 
-    pub fn new(node_id: NodeId, msg: Msg) -> Self {
-        Self {
-            from: node_id,
-            nonce: rand::random(),
-            at: chrono::Utc::now().timestamp_millis(),
-            msg,
-        }
-    }
-
-    pub fn to_bytes(&self) -> Vec<u8> {
+    pub fn to_json(&self) -> Vec<u8> {
         serde_json::to_vec(self).expect("serde_json::to_vec is infallible")
     }
+    */
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -61,20 +59,6 @@ pub enum Msg {
     ShareFile { filename: String, size: u64, ticket: BlobTicket },
 }
 
-/*
-impl Msg {
-    pub fn to_vec(self, from: NodeId) -> Vec<u8> {
-        serde_json::to_vec(&Message {
-            nonce: rand::random(),
-            at: chrono::Utc::now().timestamp_millis(),
-            from,
-            msg: self,
-        })
-        .expect("serde_json::to_vec is infallible")
-    }
-}
-*/
-
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TopicTicket {
     pub topic: TopicId,
@@ -82,11 +66,11 @@ pub struct TopicTicket {
 }
 
 impl TopicTicket {
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
+    pub fn from_json(bytes: &[u8]) -> Result<Self> {
         serde_json::from_slice(bytes).map_err(Into::into)
     }
 
-    pub fn to_bytes(&self) -> Vec<u8> {
+    pub fn to_json(&self) -> Vec<u8> {
         serde_json::to_vec(self).expect("serde_json::to_vec is infallible")
     }
 
@@ -108,7 +92,7 @@ impl TopicTicket {
 impl fmt::Display for TopicTicket {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         // let text = general_purpose::STANDARD.encode(&self.to_bytes()[..]);
-        let mut text = data_encoding::BASE32_NOPAD.encode(&self.to_bytes()[..]);
+        let mut text = data_encoding::BASE32_NOPAD.encode(&self.to_json()[..]);
         text.make_ascii_lowercase();
         write!(f, "{}", text)
     }
@@ -120,11 +104,11 @@ impl FromStr for TopicTicket {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         // let bytes = general_purpose::STANDARD.decode(s.as_bytes())?;
         let bytes = data_encoding::BASE32_NOPAD.decode(s.to_ascii_uppercase().as_bytes())?;
-        Self::from_bytes(&bytes)
+        Self::from_json(&bytes)
     }
 }
 
-pub fn parse_raw_message(bts: &Bytes) -> Result<Message> {
+pub fn parse_raw_message(bts: &Bytes) -> Result<(Message, DateTime<Local>)> {
     if bts.len() <= 64 {
         return Err(anyhow!("invalid length: {}", bts.len()));
     }
@@ -132,13 +116,16 @@ pub fn parse_raw_message(bts: &Bytes) -> Result<Message> {
     let signature =
         Signature::from_slice(&bts[..64]).map_err(|e| anyhow!("parse signature: {e:?}"))?;
 
-    let message = Message::from_bytes(&bts[64..]).map_err(|e| anyhow!("parse message: {e:?}"))?;
+    let message: Message =
+        serde_json::from_slice(&bts[64..]).map_err(|e| anyhow!("parse message: {e:?}"))?;
+    // Message::from_json(&bts[64..]).map_err(|e| anyhow!("parse message: {e:?}"))?;
 
     message.from.verify(&bts[64..], &signature).map_err(|e| anyhow!("verify signature: {e:?}"))?;
 
+    let at = local_from_millis(message.at)?;
     // TODO: nonce, at
 
-    Ok(message)
+    Ok((message, at))
 }
 
 #[derive(Clone)]
@@ -163,25 +150,6 @@ impl MemDB {
         (self.node_id, self.name.clone())
     }
 
-    pub fn sign_msg(&self, msg: Msg) -> Bytes {
-        let bts = serde_json::to_vec(&Message {
-            from: self.node_id,
-            nonce: rand::random(),
-            at: chrono::Utc::now().timestamp_millis(),
-            msg,
-        })
-        .expect("serde_json::to_vec is infallible");
-
-        let signature = self.secret_key.sign(&bts);
-
-        let mut buf = Vec::with_capacity(64 + bts.len());
-
-        buf.extend(&signature.to_bytes());
-        buf.extend(bts);
-
-        buf.into()
-    }
-
     pub fn sign_message(&self, message: &Message) -> Bytes {
         let bts = serde_json::to_vec(message).expect("serde_json::to_vec is infallible");
         let signature = self.secret_key.sign(&bts);
@@ -192,6 +160,11 @@ impl MemDB {
         buf.extend(bts);
 
         buf.into()
+    }
+
+    pub fn sign_msg(&self, msg: Msg) -> Bytes {
+        let message = Message::new(self.node_id, msg);
+        self.sign_message(&message)
     }
 }
 
