@@ -45,13 +45,11 @@ async fn main() -> io::Result<()> {
             }
 
             // Ctrl+C support
-            /*
             _ = tokio::signal::ctrl_c() => {
                 println!("");
                 warn!("received Ctrl+C, exiting.");
                 break;
             }
-            */
         };
 
         match line {

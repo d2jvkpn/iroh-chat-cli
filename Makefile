@@ -25,6 +25,9 @@ test02:
 test03:
 	cargo test --test test03
 
+test04:
+	cargo test --test test04 -- --nocapture
+
 Alice:
 	cargo run --bin iroh-chat-cli --  --name Alice open -w configs/Alice.topic.ticket
 

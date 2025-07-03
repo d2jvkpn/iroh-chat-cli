@@ -153,8 +153,8 @@ pub fn parse_raw_message(bts: &Bytes) -> Result<(NodeId, DateTime<Local>, Messag
     if bts.len() <= 96 {
         return Err(anyhow!("invalid raw message length: {}", bts.len()));
     }
-    let (from, bts) = bts.split_at(32);
-    let (signature, payload) = bts.split_at(64);
+    // let (left, right) = bts.split_at(32);
+    let (from, signature, payload) = (&bts[..32], &bts[32..96], &bts[96..]);
 
     let from = NodeId::from_bytes(from.try_into().unwrap())
         .map_err(|e| anyhow!("invalid node_id: {e:?}"))?;
@@ -168,7 +168,8 @@ pub fn parse_raw_message(bts: &Bytes) -> Result<(NodeId, DateTime<Local>, Messag
         serde_json::from_slice(payload).map_err(|e| anyhow!("parse message: {e:?}"))?;
     // Message::from_json(&bts[64..]).map_err(|e| anyhow!("parse message: {e:?}"))?;
 
-    let at = local_from_millis(message.timestamp_ms)?;
+    let at = local_from_millis(message.timestamp_ms)
+        .map_err(|e| anyhow!("invalid timestamp_ms: {e:?}"))?;
     // TODO: check at when it's not an AboutMe
 
     Ok((from, at, message))
@@ -176,6 +177,6 @@ pub fn parse_raw_message(bts: &Bytes) -> Result<(NodeId, DateTime<Local>, Messag
 
 impl fmt::Display for MemDB {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "node_id={}, name={}", self.node_id, self.name)
+        write!(f, "node_id={}, name={:?}", self.node_id, self.name)
     }
 }

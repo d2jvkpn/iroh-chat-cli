@@ -17,6 +17,8 @@ chrono = "0.4"
 
 [dev-dependencies]
 crossterm = "0.29"
+futures = "0.3"
+tokio-util = "0.7"
 
 [dependencies]
 anyhow = "1"
