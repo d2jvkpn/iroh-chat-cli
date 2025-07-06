@@ -121,13 +121,13 @@ pub async fn input_loop(mem_db: MemDB, sender: GossipSender, relay_map: RelayMap
                     if output.status.success() {
                         let stdout = String::from_utf8_lossy(&output.stdout);
                         info!(
-                            "{} success: {:?}\nelapsed: {:?}, stdout: \n{}",
+                            "{} success: {:?}\n=== Elapsed: {:?}, stdout: \n{}",
                             command, args, elapsed, stdout,
                         );
                     } else {
                         let stderr = String::from_utf8_lossy(&output.stderr);
                         error!(
-                            "{} failed: {:?}\n\nelapsed: {:?}, stderr: \n{}",
+                            "{} failed: {:?}\n=== Elapsed: {:?}, stderr: \n{}",
                             command, args, elapsed, stderr,
                         );
                     }
@@ -242,7 +242,7 @@ pub async fn input_loop(mem_db: MemDB, sender: GossipSender, relay_map: RelayMap
                     println!("{}", EOF_BLOCK);
                 });
             }
-            v if v.starts_with(":") => error!("Unknown command: {v:?}"),
+            v if v.starts_with("::") => error!("Unknown command: {v:?}"),
             _ => {
                 let msg = Msg::Message { text: text };
 

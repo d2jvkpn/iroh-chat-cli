@@ -131,14 +131,14 @@ impl MemDB {
     }
 
     pub fn sign_message(&self, message: &Message) -> Bytes {
-        let bts = serde_json::to_vec(message).expect("serde_json::to_vec is infallible");
-        let signature = self.secret_key.sign(&bts);
+        let palyload = serde_json::to_vec(message).expect("serde_json::to_vec is infallible");
+        let signature = self.secret_key.sign(&palyload);
 
-        let mut buf = Vec::with_capacity(96 + bts.len());
+        let mut buf = Vec::with_capacity(96 + palyload.len());
 
         buf.extend(self.node_id.as_bytes());
         buf.extend(&signature.to_bytes());
-        buf.extend(bts);
+        buf.extend(palyload);
 
         buf.into()
     }

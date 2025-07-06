@@ -235,4 +235,12 @@ mod tests {
         let at = Utc::now().timestamp_millis();
         println!("{:?}, {:?}", at.to_be_bytes(), 0_i32.to_be_bytes());
     }
+
+    #[test]
+    fn error() {
+        use anyhow::anyhow;
+
+        let err = anyhow!("an error").context("--> 1");
+        println!("error: {err:?}");
+    }
 }
