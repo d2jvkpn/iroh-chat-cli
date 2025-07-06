@@ -246,19 +246,27 @@ async fn main() -> Result<()> {
     let (fuse1, fuse2) = (task1.fuse(), task2.fuse());
     pin_mut!(fuse1, fuse2);
 
-    tokio::select! {
-        _ = &mut fuse1 => warn!("subscribe_loop exited."),
-        _ = &mut fuse2 => warn!("input_loop exited."),
+    let (result1, result2) = tokio::select! {
+        result1 = &mut fuse1 => {
+            warn!("subscribe_loop exited.");
+            cancel_token.cancel();
+            (result1, fuse2.await)
+        }
+        result2 = &mut fuse2 => {
+            warn!("input_loop exited.");
+            cancel_token.cancel();
+            (fuse1.await, result2)
+        }
         _ = signal::ctrl_c() => {
             println!("");
             error!("<-- received Ctrl+C.");
+            warn!("--> cancel token");
+            cancel_token.cancel();
+            (fuse1.await, fuse2.await)
         }
-    }
-    warn!("--> cancel token");
-    cancel_token.cancel();
+    };
 
-    let (result1, result2) = tokio::join!(fuse1, fuse2);
-
+    // let (result1, result2) = tokio::join!(task1, task2);
     match result1 {
         Ok(Ok(_)) => {}
         Ok(Err(e)) => error!("subscribe_loop return error: {e:?}"),
@@ -271,6 +279,7 @@ async fn main() -> Result<()> {
         Err(e) => error!("input_loop join error: {e:?}"),
     }
 
+    // warn!("router.shutdown()");
     router.shutdown().await?;
 
     warn!("<== Quit");

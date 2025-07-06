@@ -42,10 +42,12 @@ pub async fn subscribe_loop(
 
     // while let Some(event) = receiver.try_next().await? {
     loop {
+        // println!("=== subscribe_loop: {message:?}");
+
         let event = tokio::select! {
             _ = cancel_token.cancelled() => {
                 warn!("<-- subscribe_loop received cancellation.");
-                return Ok(());
+                break;
             }
             v = receiver.try_next() => v?,
         };
@@ -139,5 +141,6 @@ pub async fn subscribe_loop(
         println!("{}", EOF_BLOCK);
     }
 
-    // Ok(())
+    // info!("subscribe_loop return");
+    Ok(())
 }

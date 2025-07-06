@@ -30,15 +30,27 @@ async fn main() {
 
     info!("==> Starting tasks: pid={}...", std::process::id());
     // Wait for either task to complete
-    tokio::select! {
+    let (ans1, ans2) = tokio::select! {
         // _ = task1 => {
-        _ = &mut fuse1 => {
+        ans1 = &mut fuse1 => {
             warn!("task1 exited.");
+            warn!("--> cancel token");
+            cancel_token.cancel();
+            (ans1, fuse2.await)
         }
-        _ = &mut fuse2 => warn!("task2 exited."),
+        ans2 = &mut fuse2 => {
+            warn!("task2 exited.");
+            warn!("--> cancel token");
+            cancel_token.cancel();
+            (fuse1.await, ans2)
+        }
         _ = signal::ctrl_c() => {
             println!("");
             error!("<-- received Ctrl+C.");
+            warn!("--> cancel token");
+            cancel_token.cancel();
+            info!("<-- waitting for both to fully shutdown.");
+            (fuse1.await, fuse2.await)
         }
         //_ = sigint.recv() => {
         //    println!("");
@@ -47,21 +59,19 @@ async fn main() {
         _ = sigterm.recv() => {
             println!("");
             error!("<-- received SIGTERM (kill)");
+            warn!("--> cancel token");
+            cancel_token.cancel();
+            info!("<-- waitting for both to fully shutdown.");
+            (fuse1.await, fuse2.await)
         }
+    };
 
-    }
-    warn!("--> cancel token");
-    cancel_token.cancel();
-
-    info!("<-- waitting for both to fully shutdown.");
     // Optionally wait for both to fully shutdown
-    // let _ = (task1.await, task2.await);
-    // let _ = (fuse1.await, fuse2.await);
-    let (ans1, ans2) = tokio::join!(fuse1, fuse2); // Result<u32, JoinError>
+    // let (ans1, ans2) = tokio::join!(task1.await, task2.await);
     info!("<-- answers: task1={ans1:?}, task2={ans2:?}.");
 
     warn!("<== All tasks exited.");
-    // std::process::exit(0);
+    std::process::exit(0);
 }
 
 async fn run_task(name: &str, cancel_token: CancellationToken) -> u32 {

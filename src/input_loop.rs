@@ -68,12 +68,13 @@ pub async fn input_loop(
 
     // while let Some(line) = reader.next_line().await? {
     loop {
+        // println!("=== input_loop...");
         let next_line = tokio::select! {
             _ = cancel_token.cancelled() => {
                 warn!("<-- input_loop received cancellation.");
                 sender.broadcast(mem_db.sign_msg(Msg::Bye {})).await?;
                 time::sleep(time::Duration::from_millis(100)).await;
-                return Ok(());
+                break;
             }
             v = reader.next_line() => v?,
         };
@@ -278,5 +279,7 @@ pub async fn input_loop(
     }
 
     blobs_router.shutdown().await?;
+
+    // info!("input_loop return");
     Ok(())
 }
