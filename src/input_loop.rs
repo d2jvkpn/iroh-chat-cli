@@ -72,8 +72,6 @@ pub async fn input_loop(
         let next_line = tokio::select! {
             _ = cancel_token.cancelled() => {
                 warn!("<-- input_loop received cancellation.");
-                sender.broadcast(mem_db.sign_msg(Msg::Bye {})).await?;
-                time::sleep(time::Duration::from_millis(100)).await;
                 break;
             }
             v = reader.next_line() => v?,
@@ -98,9 +96,6 @@ pub async fn input_loop(
 
         match command {
             COMMAND_QUIT => {
-                // broadcast the encoded message
-                sender.broadcast(mem_db.sign_msg(Msg::Bye {})).await?;
-                time::sleep(time::Duration::from_millis(100)).await;
                 break;
             }
             COMMAND_ME => println!("node_id={node_id}, name={name:?}"),
@@ -278,8 +273,10 @@ pub async fn input_loop(
         println!("{}", EOF_BLOCK);
     }
 
-    blobs_router.shutdown().await?;
+    sender.broadcast(mem_db.sign_msg(Msg::Bye {})).await?;
+    time::sleep(time::Duration::from_millis(10)).await;
 
+    blobs_router.shutdown().await?;
     // info!("input_loop return");
     Ok(())
 }

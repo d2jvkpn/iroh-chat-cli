@@ -187,6 +187,7 @@ async fn main() -> Result<()> {
     println!("--> node: {:?}", mem_db.node());
     println!("    relay_url: {:?}", node_addr.relay_url());
     println!("    direct_addresses: {:?}", node_addr.direct_addresses().collect::<Vec<_>>());
+
     if let Some(v) = write_ticket {
         write_topic_ticket(&ticket, &v).await?;
         println!("    ticket: {v}");
@@ -247,15 +248,15 @@ async fn main() -> Result<()> {
     pin_mut!(fuse1, fuse2);
 
     let (result1, result2) = tokio::select! {
-        result1 = &mut fuse1 => {
+        v = &mut fuse1 => {
             warn!("subscribe_loop exited.");
             cancel_token.cancel();
-            (result1, fuse2.await)
+            (v, fuse2.await)
         }
-        result2 = &mut fuse2 => {
+        v = &mut fuse2 => {
             warn!("input_loop exited.");
             cancel_token.cancel();
-            (fuse1.await, result2)
+            (fuse1.await, v)
         }
         _ = signal::ctrl_c() => {
             println!("");
