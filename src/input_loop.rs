@@ -13,10 +13,16 @@ use iroh_blobs::{net_protocol::Blobs, ticket::BlobTicket};
 use iroh_gossip::net::GossipSender;
 use tokio::io::{self, AsyncBufReadExt};
 use tokio::time;
+use tokio_util::sync::CancellationToken;
 use tracing::{error, info, warn}; // Level, instrument
 
 /// Read input from stdin
-pub async fn input_loop(mem_db: MemDB, sender: GossipSender, relay_map: RelayMap) -> Result<()> {
+pub async fn input_loop(
+    cancel_token: CancellationToken,
+    mem_db: MemDB,
+    sender: GossipSender,
+    relay_map: RelayMap,
+) -> Result<()> {
     // broadcast each line we type
     info!("==> Type a message and hit enter to broadcast...");
 
@@ -60,7 +66,23 @@ pub async fn input_loop(mem_db: MemDB, sender: GossipSender, relay_map: RelayMap
     let mut reader = io::BufReader::new(io::stdin()).lines();
     let mut buffer = String::new();
 
-    while let Some(line) = reader.next_line().await? {
+    // while let Some(line) = reader.next_line().await? {
+    loop {
+        let next_line = tokio::select! {
+            _ = cancel_token.cancelled() => {
+                warn!("<-- input_loop received cancellation.");
+                sender.broadcast(mem_db.sign_msg(Msg::Bye {})).await?;
+                time::sleep(time::Duration::from_millis(100)).await;
+                return Ok(());
+            }
+            v = reader.next_line() => v?,
+        };
+
+        let line = match next_line {
+            Some(v) => v,
+            None => continue,
+        };
+
         if line.trim_end_matches(eol).ends_with(' ') {
             buffer.push_str(line.trim_end());
             buffer.push('\n');
@@ -75,9 +97,8 @@ pub async fn input_loop(mem_db: MemDB, sender: GossipSender, relay_map: RelayMap
 
         match command {
             COMMAND_QUIT => {
-                let msg = Msg::Bye {};
                 // broadcast the encoded message
-                sender.broadcast(mem_db.sign_msg(msg)).await?;
+                sender.broadcast(mem_db.sign_msg(Msg::Bye {})).await?;
                 time::sleep(time::Duration::from_millis(100)).await;
                 break;
             }

@@ -6,11 +6,13 @@ use iroh_chat_cli::{input_loop, subscribe_loop};
 
 use anyhow::{Result, anyhow};
 use clap::{ArgAction, Args, Parser};
+use futures::{FutureExt, pin_mut};
 use iroh::{Endpoint, NodeAddr, RelayMap, RelayMode, RelayUrl, SecretKey, protocol::Router};
+use tokio_util::sync::CancellationToken;
 /* RelayUrlParseError, RelayNode */
 use iroh_gossip::{net::Gossip, proto::TopicId};
 use rand::prelude::*;
-use tokio::{fs, io::AsyncWriteExt};
+use tokio::{fs, io::AsyncWriteExt, signal};
 use tracing::{error, info, warn}; // Level, instrument
 use tracing_subscriber::EnvFilter;
 
@@ -217,16 +219,58 @@ async fn main() -> Result<()> {
     let about_me = Msg::AboutMe { name: name.clone() };
     sender.broadcast(mem_db.sign_msg(about_me).into()).await?;
 
+    /*
     tokio::spawn(subscribe_loop(mem_db.clone(), sender.clone(), receiver));
 
     if let Err(e) = input_loop(mem_db.clone(), sender.clone(), relay_map).await {
         error!("input_loop: {e:?}");
     }
+    */
+
+    let cancel_token = CancellationToken::new();
+
+    let task1 = tokio::task::spawn(subscribe_loop(
+        cancel_token.clone(),
+        mem_db.clone(),
+        sender.clone(),
+        receiver,
+    ));
+
+    let task2 = tokio::task::spawn(input_loop(
+        cancel_token.clone(),
+        mem_db.clone(),
+        sender.clone(),
+        relay_map,
+    ));
+
+    let (fuse1, fuse2) = (task1.fuse(), task2.fuse());
+    pin_mut!(fuse1, fuse2);
+
+    tokio::select! {
+        _ = &mut fuse1 => {
+            warn!("subscribe_loop exited.");
+        }
+        _ = &mut fuse2 => warn!("input_loop exited."),
+        _ = signal::ctrl_c() => {
+            println!("");
+            error!("<-- received Ctrl+C.");
+        }
+    }
+    warn!("--> cancel token");
+    cancel_token.cancel();
+
+    let (result1, result2) = tokio::join!(fuse1, fuse2);
+    if let Err(e) = result1 {
+        error!("subscribe_loop: {e}");
+    }
+    if let Err(e) = result2 {
+        error!("input_loop: {e}");
+    }
 
     router.shutdown().await?;
 
     warn!("<== Quit");
-    Ok(())
+    std::process::exit(0);
 }
 
 pub async fn write_topic_ticket(ticket: &TopicTicket, filename: &str) -> Result<()> {

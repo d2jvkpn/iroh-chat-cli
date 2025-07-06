@@ -7,9 +7,11 @@ use anyhow::Result;
 use futures_lite::StreamExt;
 use iroh::PublicKey;
 use iroh_gossip::net::{self, Event, GossipEvent, GossipReceiver, GossipSender};
+use tokio_util::sync::CancellationToken;
 use tracing::{error, info, warn}; // Level, instrument
 
 pub async fn subscribe_loop(
+    cancel_token: CancellationToken,
     mem_db: MemDB,
     sender: GossipSender,
     mut receiver: GossipReceiver,
@@ -38,26 +40,40 @@ pub async fn subscribe_loop(
             .unwrap_or_else(|| format!("{from}"))
     };
 
-    while let Some(event) = receiver.try_next().await? {
-        let message: net::Message = match event {
-            Event::Lagged => {
+    // while let Some(event) = receiver.try_next().await? {
+    loop {
+        let event = tokio::select! {
+            _ = cancel_token.cancelled() => {
+                warn!("<-- subscribe_loop received cancellation.");
+                return Ok(());
+            }
+            v = receiver.try_next() => v?,
+        };
+
+        let event = match event {
+            Some(Event::Lagged) => {
                 warn!("=== Lagged");
                 continue;
             }
-            Event::Gossip(GossipEvent::Joined(node_ids)) => {
+            Some(Event::Gossip(v)) => v,
+            None => continue,
+        };
+
+        let message: net::Message = match event {
+            GossipEvent::Joined(node_ids) => {
                 info!("=== Joined: {:?}", node_ids);
                 continue;
             }
-            Event::Gossip(GossipEvent::NeighborUp(from)) => {
+            GossipEvent::NeighborUp(from) => {
                 info!("=== NeighborUp: {from}");
                 continue;
             }
-            Event::Gossip(GossipEvent::NeighborDown(from)) => {
+            GossipEvent::NeighborDown(from) => {
                 let entry = remove_entry(&from).await;
                 info!("=== NeighborDown: {entry}");
                 continue;
             }
-            Event::Gossip(GossipEvent::Received(v)) => v,
+            GossipEvent::Received(v) => v,
         };
 
         // let from = msg.delivered_from;
@@ -123,5 +139,5 @@ pub async fn subscribe_loop(
         println!("{}", EOF_BLOCK);
     }
 
-    Ok(())
+    // Ok(())
 }
