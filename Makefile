@@ -46,4 +46,4 @@ John:
 #	cargo run -- receive configs/share_file.bob.ticket configs/Cargo.toml
 
 release:
-	cargo build --release && ls -alh target/release
+	touch build.rs && cargo build --release && ls -alh target/release
