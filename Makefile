@@ -29,25 +29,21 @@ test04:
 	cargo test --test test04 -- --nocapture
 
 Alice:
-	cargo run --bin iroh-chat-cli --  --name Alice open -w configs/Alice.topic.ticket
+	cargo run -- --name Alice open -w configs/Alice.topic.ticket
 
 # $$(awk 'NR==1{printf $$1}' configs/Alice.topic.ticket | base64 -w0)
 
 Bob:
-	cargo run --bin iroh-chat-cli -- --name Bob join \
-	  configs/Alice.topic.ticket -w configs/Bob.topic.ticket
+	cargo run -- --name Bob join configs/Alice.topic.ticket -w configs/Bob.topic.ticket
 
 John:
-	cargo run --bin iroh-chat-cli -- --name John join \
-	  configs/Bob.topic.ticket -w configs/John.topic.ticket
+	cargo run -- --name John join configs/Bob.topic.ticket -w configs/John.topic.ticket
 
-share_file:
-	cargo run --bin iroh-share-file -- share Cargo.toml configs/share_file.bob.ticket
+#share_file:
+#	cargo run -- share Cargo.toml configs/share_file.bob.ticket
 
-receive_file:
-	cargo run --bin iroh-share-file -- receive \
-	  configs/share_file.bob.ticket configs/Cargo.toml
+#receive_file:
+#	cargo run -- receive configs/share_file.bob.ticket configs/Cargo.toml
 
 release:
-	cargo build --release
-	ls -alh target/release
+	cargo build --release && ls -alh target/release

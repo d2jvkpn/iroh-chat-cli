@@ -8,25 +8,18 @@ version: 0.1.0
 
 
 #### ch01. 文档与运行
-1. docs
+1. 文档列表
 - p2p chat, in rust, from scratch: https://www.youtube.com/watch?v=ogN_mBkWu7o
 - https://www.iroh.computer/docs/examples/gossip-chat
 - https://github.com/n0-computer/iroh-blobs/blob/main/examples/transfer.rs
 - https://github.com/n0-computer/iroh/releases
 
-2. chat
+2. 发起一个聊天
 ```
-make Alice  # cargo run --bin iroh-chat-cli -- --name Alice open
-make Bob    # cargo run --bin iroh-chat-cli -- --name Bob join [ticket_str | ticket_path]
-make John   # cargo run --bin iroh-chat-cli -- --name John join [ticket_str | ticket_path]
+make Alice  # cargo run -- --name Alice open -w configs/Alice.topic.ticket
+make Bob    # cargo run -- --name Bob join configs/Alice.topic.ticket -w configs/Bob.topic.ticket
+make John   # cargo run -- --name John join configs/Bob.topic.ticket -w configs/John.topic.ticket
 ```
-
-3. share a file
-```
-make share_file    # cargo run --bin iroh-share-file -- share [filepath] [option(ticket_path)]
-make receive_file  # cargo run --bin iroh-share-file -- receive [ticket_str | ticket_path] [filepath]
-``
-
 
 #### ch02. 聊天
 1. 发送单行消息
@@ -46,32 +39,37 @@ How are you today?\n
 ::me\n
 ```
 
-4. 退出聊天
+4. 帮助
+```
+::help\n
+```
+
+5. 退出聊天
 ```
 ::quit\n
 ```
 
-5. 查看当前在线用户
+6. 查看当前在线用户
 ```
 ::members\n
 ```
 
-6. 直接发送一个小文件（最大支持 8MB）
+7. 直接发送一个小文件（最大支持 8MB）
 ```
 ::send_file [path/to/file]\n
 ```
 
-7. 分享一个任意大小的文件
+8. 分享一个任意大小的文件
 ```
 ::share_file [path/to/file]\n
 ```
 
-8. 接收一个被分享的文件
+9. 接收一个被分享的文件
 ```
 ::receive_file [blobs_ticket] [path/to/save]\n
 ```
 
-9. 本地执行一个命令
+10. 本地执行一个命令
 ```
 ::run ls -alh
 ```

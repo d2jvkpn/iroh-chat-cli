@@ -15,6 +15,7 @@ use tokio::sync::RwLock;
 
 pub const COMMAND_QUIT: &str = "::quit";
 pub const COMMAND_ME: &str = "::me";
+pub const COMMAND_HELP: &str = "::help";
 pub const COMMAND_MEMBERS: &str = "::members";
 pub const COMMAND_RUN: &str = "::run";
 
@@ -24,6 +25,8 @@ pub const COMMAND_RECEIVE_FILE: &str = "::receive_file";
 
 pub const MAX_FILESIZE: u64 = 8 * 1024 * 1024;
 pub const EOF_BLOCK: &str = "----------------------------------------------------------------";
+
+pub const DOC_HELP: &str = include_str!("help.md");
 
 // add the message code to the bottom
 #[derive(Debug, Serialize, Deserialize)]

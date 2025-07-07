@@ -2,15 +2,16 @@
 name = "iroh-chat-cli"
 version = "0.1.2"
 edition = "2024"
-default-run = "iroh-chat-cli"
 
-[[bin]]
-name = "iroh-chat-cli"
-path = "src/bin/chat.rs"
+#default-run = "iroh-chat-cli"
 
-[[bin]]
-name = "iroh-share-file"
-path = "src/bin/share.rs"
+#[[bin]]
+#name = "iroh-chat-file"
+#path = "src/bin/chat.rs"
+
+#[[bin]]
+#name = "iroh-share-file"
+#path = "src/bin/share.rs"
 
 [build-dependencies]
 chrono = "0.4"

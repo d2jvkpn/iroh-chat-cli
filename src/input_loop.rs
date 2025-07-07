@@ -1,8 +1,8 @@
 use std::{path, process::Command, time::Instant};
 
 use crate::structs::{
-    COMMAND_ME, COMMAND_MEMBERS, COMMAND_QUIT, COMMAND_RECEIVE_FILE, COMMAND_RUN,
-    COMMAND_SEND_FILE, COMMAND_SHARE_FILE, EOF_BLOCK, MAX_FILESIZE, MemDB, Msg,
+    COMMAND_HELP, COMMAND_ME, COMMAND_MEMBERS, COMMAND_QUIT, COMMAND_RECEIVE_FILE, COMMAND_RUN,
+    COMMAND_SEND_FILE, COMMAND_SHARE_FILE, DOC_HELP, EOF_BLOCK, MAX_FILESIZE, MemDB, Msg,
 };
 use crate::transfer::{receive_file, share_file};
 use crate::utils::{read_file_content, split_first_space};
@@ -99,6 +99,7 @@ pub async fn input_loop(
                 break;
             }
             COMMAND_ME => println!("node_id={node_id}, name={name:?}"),
+            COMMAND_HELP => print!("{}", DOC_HELP),
             COMMAND_MEMBERS => {
                 let members = mem_db.members.read().await;
                 println!("- node_id: {node_id}\n  name: {name:?}\n  tags: [self]");

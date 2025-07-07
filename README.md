@@ -14,19 +14,12 @@ version: 0.1.1
 - https://github.com/n0-computer/iroh-blobs/blob/main/examples/transfer.rs
 - https://github.com/n0-computer/iroh/releases
 
-2. a chat example
+2. create a chat room
 ```
-make Alice  # cargo run --bin iroh-chat-cli -- --name Alice open
-make Bob    # cargo run --bin iroh-chat-cli -- --name Bob join [ticket_str | ticket_path]
-make John   # cargo run --bin iroh-chat-cli -- --name John join [ticket_str | ticket_path]
+make Alice  # cargo run -- --name Alice open -w configs/Alice.topic.ticket
+make Bob    # cargo run -- --name Bob join configs/Alice.topic.ticket -w configs/Bob.topic.ticket
+make John   # cargo run -- --name John join configs/Bob.topic.ticket -w configs/John.topic.ticket
 ```
-
-3. share a file
-```
-make share_file    # cargo run --bin iroh-share-file -- share [filepath] [option(ticket_path)]
-make receive_file  # cargo run --bin iroh-share-file -- receive [ticket_str | ticket_path] [filepath]
-```
-
 
 #### ch02. chatting
 1. send an oneline message
@@ -46,32 +39,37 @@ How are you today?\n
 ::me\n
 ```
 
-4. quit
+4. help
+```
+::help\n
+```
+
+5. quit
 ```
 ::quit\n
 ```
 
-5. show online members
+6. show online members
 ```
 ::members\n
 ```
 
-6. send a small file directly (max size=8M)
+7. send a small file directly (max size=8M)
 ```
 ::send_file [path/to/file]\n
 ```
 
-7. share a file (any size)
+8. share a file (any size)
 ```
 ::share_file [path/to/file]\n
 ```
 
-8. receive a shared file
+9. receive a shared file
 ```
 ::receive_file [blobs_ticket] [path/to/save]\n
 ```
 
-9. run a local command
+10. run a local command
 ```
 ::run ls -alh
 ```
