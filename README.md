@@ -54,7 +54,7 @@ How are you today?\n
 ::members\n
 ```
 
-7. send a small file directly (max size=8M)
+7. send a small file directly(max size=8M)
 ```
 ::send_file [path/to/file]\n
 ```

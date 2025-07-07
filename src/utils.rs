@@ -16,6 +16,8 @@ use tracing_subscriber::fmt::{self, time::FormatTime}; // writer::MakeWriterExt
 
 const _BUILD_INFO: &str = concat!(
     "\nBuildInfo:",
+    "\n  rustc_version: ",
+    env!("RUESTC_VERSION"),
     "\n  build_time: ",
     env!("BUILD_TIME"),
     "\n  version: ",
@@ -36,6 +38,7 @@ const _BUILD_INFO: &str = concat!(
 pub fn build_info() -> String {
     format!(
         r#"BuildInfo:
+  rustc_version  : {}
   build_time     : {}
   version        : {}
   git_registry   : {}
@@ -43,6 +46,7 @@ pub fn build_info() -> String {
   git_status     : {}
   git_commit_hash: {}
   git_commit_time: {}"#,
+        env!("RUESTC_VERSION"),
         env!("BUILD_TIME"),
         env!("CARGO_PKG_VERSION"),
         env!("GIT_REGISTRY"),

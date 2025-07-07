@@ -11,10 +11,8 @@ use tracing_subscriber::EnvFilter;
 async fn main() {
     utils::log2stdout(EnvFilter::new("info"));
 
-    /*
     let mut sigint =
         unix::signal(unix::SignalKind::interrupt()).expect("failed to set up SIGINT handler");
-    */
 
     let mut sigterm =
         unix::signal(unix::SignalKind::terminate()).expect("failed to set up SIGTERM handler");
@@ -52,10 +50,10 @@ async fn main() {
             info!("<-- waitting for both to fully shutdown.");
             (fuse1.await, fuse2.await)
         }
-        //_ = sigint.recv() => {
-        //    println!("");
-        //    error!("<-- received SIGINT (Ctrl+C)");
-        //}
+        _ = sigint.recv() => {
+            println!("");
+            error!("<-- received SIGINT (Ctrl+C)");
+        }
         _ = sigterm.recv() => {
             println!("");
             error!("<-- received SIGTERM (kill)");
