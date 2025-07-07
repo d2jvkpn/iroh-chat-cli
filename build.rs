@@ -11,6 +11,11 @@ fn main() {
         .map(output_utf8)
         .unwrap_or_else(|| "unknown".to_string());
 
+    let cargo_version = run(vec!["cargo", "--version"])
+        .ok()
+        .map(output_utf8)
+        .unwrap_or_else(|| "unknown".to_string());
+
     // let build_time = chrono::Local::now().to_rfc3339(); // SecondsFormat::Millis
     let build_time = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
 
@@ -42,6 +47,7 @@ fn main() {
     // git_commit_pushed: git diff origin/$git_branch..HEAD --name-status
 
     println!("cargo:rustc-env=RUESTC_VERSION={}", rustc_version);
+    println!("cargo:rustc-env=CARGO_VERSION={}", cargo_version);
     println!("cargo:rustc-env=BUILD_TIME={}", build_time);
     println!("cargo:rustc-env=GIT_REGISTRY={}", git_registry);
     println!("cargo:rustc-env=GIT_BRANCH={}", git_branch);

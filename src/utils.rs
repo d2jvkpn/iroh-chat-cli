@@ -18,6 +18,8 @@ const _BUILD_INFO: &str = concat!(
     "\nBuildInfo:",
     "\n  rustc_version: ",
     env!("RUESTC_VERSION"),
+    "\n  cargo_version: ",
+    env!("CARGO_VERSION"),
     "\n  build_time: ",
     env!("BUILD_TIME"),
     "\n  version: ",
@@ -39,6 +41,7 @@ pub fn build_info() -> String {
     format!(
         r#"BuildInfo:
   rustc_version  : {}
+  cargo_version  : {}
   build_time     : {}
   version        : {}
   git_registry   : {}
@@ -47,6 +50,7 @@ pub fn build_info() -> String {
   git_commit_hash: {}
   git_commit_time: {}"#,
         env!("RUESTC_VERSION"),
+        env!("CARGO_VERSION"),
         env!("BUILD_TIME"),
         env!("CARGO_PKG_VERSION"),
         env!("GIT_REGISTRY"),
